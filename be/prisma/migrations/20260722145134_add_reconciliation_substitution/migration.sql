@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `invoice` ADD COLUMN `reconciliationResolvedAt` DATETIME(3) NULL;
+ALTER TABLE `Invoice` ADD COLUMN `reconciliationResolvedAt` DATETIME(3) NULL;
 
 -- CreateTable
 CREATE TABLE `ReconciliationSubstitution` (

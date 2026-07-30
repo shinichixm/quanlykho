@@ -1,0 +1,2 @@
+export const INVOICE_DEFAULT_PAGE_SIZE = 20;
+export const INVOICE_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB

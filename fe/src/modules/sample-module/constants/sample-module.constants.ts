@@ -1,0 +1,1 @@
+export const SAMPLE_MODULE_PAGE_SIZE = 20;

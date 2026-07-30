@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String?  @unique
+  password  String   // bcrypt hash
+  fullName  String
+  role      UserRole @default(STAFF)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique // mã hàng nội bộ
+  name      String
+  unit      String           // đơn vị tính: cái, kg, thùng...
+  createdAt DateTime @default(now())
+
+  invoiceItems  InvoiceItem[]
+  stockTxns     StockTransaction[]
+  inventory     Inventory?
+  substitutions ReconciliationSubstitution[] @relation("SubstituteProduct")
+}
+
+model Partner {
+  id        Int      @id @default(autoincrement())
+  taxCode   String   @unique // mã số thuế, lấy từ XML hóa đơn
+  name      String
+  address   String?
+  createdAt DateTime @default(now())
+
+  invoices Invoice[]
+}
+
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  type          String   // "purchase" (mua vào -> nhập kho) | "sale" (bán ra -> xuất kho)
+  invoiceNo     String   // số hóa đơn
+  invoiceSeries String?  // ký hiệu mẫu số
+  issuedAt      DateTime // ngày hóa đơn
+  partnerId     Int
+  totalAmount   Decimal  @db.Decimal(18, 2)
+  rawXml        String?  @db.Text // lưu XML gốc để đối chiếu
+  status        String   @default("new") // new | processed | error
+  createdAt     DateTime @default(now())
+  // Thời điểm tra soát "âm kho" được xử lý xong (bổ sung nguồn hàng thay thế).
+  // Có giá trị => hóa đơn coi như "Hoàn thành" bất kể tồn kho của sản phẩm gốc.
+  reconciliationResolvedAt DateTime?
+
+  partner       Partner                      @relation(fields: [partnerId], references: [id])
+  items         InvoiceItem[]
+  substitutions ReconciliationSubstitution[]
+
+  @@unique([invoiceSeries, invoiceNo, partnerId])
+}
+
+model InvoiceItem {
+  id        Int     @id @default(autoincrement())
+  invoiceId Int
+  productId Int
+  quantity  Decimal @db.Decimal(18, 3)
+  unitPrice Decimal @db.Decimal(18, 2)
+  amount    Decimal @db.Decimal(18, 2)
+
+  invoice       Invoice                      @relation(fields: [invoiceId], references: [id])
+  product       Product                      @relation(fields: [productId], references: [id])
+  substitutions ReconciliationSubstitution[]
+}
+
+// Ghi nhận việc bổ sung/thay thế nguồn hàng còn tồn cho 1 dòng hàng bị "âm kho"
+// trong hóa đơn bán ra (nghiệp vụ tra soát hóa đơn — không ảnh hưởng tồn kho gốc
+// của sản phẩm trên hóa đơn, chỉ trừ tồn của sản phẩm thay thế khi "Hoàn thành").
+model ReconciliationSubstitution {
+  id                  Int      @id @default(autoincrement())
+  invoiceId           Int
+  invoiceItemId       Int
+  substituteProductId Int
+  quantity            Decimal  @db.Decimal(18, 3)
+  status              String   @default("draft") // draft | completed
+  createdAt           DateTime @default(now())
+
+  invoice           Invoice     @relation(fields: [invoiceId], references: [id])
+  invoiceItem       InvoiceItem @relation(fields: [invoiceItemId], references: [id])
+  substituteProduct Product     @relation("SubstituteProduct", fields: [substituteProductId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model StockTransaction {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  type      String   // "in" | "out"
+  quantity  Decimal  @db.Decimal(18, 3)
+  invoiceId Int?     // liên kết hóa đơn nguồn (nullable để sau này cho phép nhập/xuất tay)
+  note      String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, createdAt])
+}
+
+model Inventory {
+  productId Int      @id
+  quantity  Decimal  @db.Decimal(18, 3) @default(0)
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// Thông tin công ty đang sử dụng phần mềm — dùng làm tiêu đề khi xuất báo cáo.
+// Chỉ có duy nhất 1 bản ghi (singleton).
+model CompanyInfo {
+  id        Int      @id @default(autoincrement())
+  name      String
+  taxCode   String?
+  address   String?
+  phone     String?
+  email     String?
+  updatedAt DateTime @updatedAt
+}
+
+// Khách hàng khai báo thủ công (khác Partner — Partner tự sinh từ XML hóa đơn).
+// Dùng để chọn nhanh khi "Xuất hóa đơn" từ Giỏ hàng thay vì gõ tay mỗi lần.
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  taxCode   String?
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { InventoryRow } from "../types/inventory.types";
 import { AddToCartModal } from "@/modules/cart/components/AddToCartModal";
+import { useCart } from "@/modules/cart/hooks/useCart";
 import { PlusIcon } from "@/shared/ui/icons";
 
 function formatQty(value: string) {
@@ -31,6 +32,11 @@ export function InventoryTable({
   startIndex?: number;
 }) {
   const [cartTarget, setCartTarget] = useState<InventoryRow | null>(null);
+  const { items: cartItems } = useCart();
+  const cartProductIds = useMemo(
+    () => new Set(cartItems.map((item) => item.productId)),
+    [cartItems]
+  );
 
   return (
     <div className="overflow-x-auto">
@@ -50,7 +56,12 @@ export function InventoryTable({
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row.productId} className="border-b border-slate-100 last:border-0">
+            <tr
+              key={row.productId}
+              className={`border-b border-slate-100 transition-colors last:border-0 ${
+                cartProductIds.has(row.productId) ? "bg-amber-50" : ""
+              }`}
+            >
               <td className="px-5 py-3 text-slate-400">{startIndex + index + 1}</td>
               <td className="px-5 py-3 text-slate-500">{row.code}</td>
               <td

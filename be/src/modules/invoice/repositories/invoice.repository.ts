@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { prisma } from "../../../shared/db/prisma";
+import { normalizeKey } from "../../../shared/lib/normalize-key";
 import type {
   ImportInvoiceResult,
   InvoiceType,
@@ -46,8 +47,15 @@ export async function importInvoiceTransaction(
       let createdProductCount = 0;
 
       for (const item of parsed.items) {
+        const nameKey = normalizeKey(item.name);
+        const unitKey = normalizeKey(item.unit);
+
+        // So khớp theo khóa đã chuẩn hóa: tên hàng ở hóa đơn mua vào và bán ra
+        // thường lệch nhau vài khoảng trắng / ký tự xuống dòng / hoa-thường,
+        // nếu so bằng chuỗi gốc sẽ tạo sản phẩm trùng và làm sai tồn kho.
         let product = await tx.product.findFirst({
-          where: { name: item.name, unit: item.unit },
+          where: { nameKey, unitKey },
+          orderBy: { id: "asc" },
         });
 
         if (!product) {
@@ -55,7 +63,9 @@ export async function importInvoiceTransaction(
             data: {
               code: generateProductCode(),
               name: item.name,
+              nameKey,
               unit: item.unit,
+              unitKey,
             },
           });
           createdProductCount += 1;

@@ -27,8 +27,8 @@ model User {
 model Product {
   id        Int      @id @default(autoincrement())
   code      String   @unique // mã hàng nội bộ
-  name      String
-  unit      String           // đơn vị tính: cái, kg, thùng...
+  name      String   @db.VarChar(1000) // tên hàng lấy từ XML hóa đơn, có thể rất dài
+  unit      String   @db.VarChar(255)  // đơn vị tính: cái, kg, thùng...
   createdAt DateTime @default(now())
 
   invoiceItems  InvoiceItem[]
@@ -40,8 +40,8 @@ model Product {
 model Partner {
   id        Int      @id @default(autoincrement())
   taxCode   String   @unique // mã số thuế, lấy từ XML hóa đơn
-  name      String
-  address   String?
+  name      String   @db.VarChar(500)
+  address   String?  @db.VarChar(1000)
   createdAt DateTime @default(now())
 
   invoices Invoice[]

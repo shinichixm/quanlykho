@@ -128,7 +128,8 @@ export function parseInvoiceXml(xml: string, type: InvoiceType): ParsedInvoice {
   if (!issuedAtRaw) throw new Error("Không tìm thấy ngày lập hóa đơn (NLap) trong file XML");
 
   const rawPartnerTaxCode = text(findFirst(partnerNode, "MST"));
-  const partnerName = text(findFirst(partnerNode, "Ten"));
+  // Giới hạn độ dài để không vượt quá kích thước cột trong DB (xem schema.prisma).
+  const partnerName = text(findFirst(partnerNode, "Ten")).slice(0, 500);
 
   if (!partnerName) throw new Error("Không tìm thấy tên đối tác (Ten) trong file XML");
 
@@ -137,12 +138,13 @@ export function parseInvoiceXml(xml: string, type: InvoiceType): ParsedInvoice {
 
   const items: ParsedInvoiceItem[] = itemNodes
     .map((raw) => {
-      const name = text(findFirst(raw, "THHDVu"));
+      // Cắt bớt cho khớp giới hạn cột DB (Product.name VarChar(1000), unit VarChar(255)).
+      const name = text(findFirst(raw, "THHDVu")).slice(0, 1000);
       if (!name) return null;
 
       return {
         name,
-        unit: text(findFirst(raw, "DVTinh")) || "cái",
+        unit: (text(findFirst(raw, "DVTinh")) || "cái").slice(0, 255),
         quantity: num(findFirst(raw, "SLuong")),
         unitPrice: num(findFirst(raw, "DGia")),
         amount: num(findFirst(raw, "ThTien")),
@@ -166,7 +168,7 @@ export function parseInvoiceXml(xml: string, type: InvoiceType): ParsedInvoice {
     partnerTaxCode,
     partnerTaxCodeMissing,
     partnerName,
-    partnerAddress: text(findFirst(partnerNode, "DChi")) || null,
+    partnerAddress: text(findFirst(partnerNode, "DChi")).slice(0, 1000) || null,
     totalAmount,
     items,
   };

@@ -12,6 +12,8 @@ const ZERO_WIDTH = /[​‌‍⁠﻿]/g;
 const SINGLE_QUOTES = /[‘’‚‛′`´]/g;
 // Mọi kiểu nháy kép/cong/guillemet -> "
 const DOUBLE_QUOTES = /[“”„‟″«»]/g;
+// Mọi kiểu gạch ngang (hyphen, en/em dash...) -> '-'
+const DASHES = /[‐-―]/g;
 
 export function normalizeKey(input: string | null | undefined): string {
   if (!input) return "";
@@ -21,7 +23,11 @@ export function normalizeKey(input: string | null | undefined): string {
     .replace(ZERO_WIDTH, "")
     .replace(SINGLE_QUOTES, "'")
     .replace(DOUBLE_QUOTES, '"')
+    .replace(DASHES, "-")
     .replace(/\s+/g, " ") // gộp mọi loại khoảng trắng (kể cả \n, \t, NBSP) thành 1 dấu cách
+    // Bỏ khoảng trắng bao quanh '-' và '/': nhà cung cấp gõ "4- port", "4 -port",
+    // "512E/ HPE", "512E /HPE"... cho cùng một nội dung.
+    .replace(/ ?([/-]) ?/g, "$1")
     .trim()
     .toLowerCase();
 }

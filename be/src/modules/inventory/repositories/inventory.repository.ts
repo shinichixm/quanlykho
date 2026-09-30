@@ -103,6 +103,22 @@ export function createInventoryAdjustment(input: {
       update: { quantity: { increment: input.quantity } },
     });
 
+    // Màn tra soát chỉ coi 1 sản phẩm là "còn hàng" khi vừa có Inventory.quantity > 0
+    // VỪA có ít nhất 1 StockTransaction type "in" — nếu thiếu dòng này, tồn dương
+    // do điều chỉnh vẫn không hiện ra được khi tìm hàng thay thế.
+    const qty = Number(input.quantity);
+    if (qty !== 0) {
+      await tx.stockTransaction.create({
+        data: {
+          productId: input.productId,
+          type: qty > 0 ? "in" : "out",
+          quantity: Math.abs(qty),
+          invoiceId: null,
+          note: input.note ? `Điều chỉnh tồn kho: ${input.note}` : "Điều chỉnh tồn kho",
+        },
+      });
+    }
+
     return adjustment;
   });
 }

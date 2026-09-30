@@ -1,9 +1,12 @@
 /**
  * Chuẩn hóa một chuỗi tự do (tên hàng, đơn vị tính lấy từ XML hóa đơn) thành
- * "khóa so khớp" ổn định, để hai chuỗi chỉ khác nhau về khoảng trắng / kiểu dấu
- * nháy / hoa-thường / ký tự ẩn vẫn được coi là CÙNG một sản phẩm.
+ * "khóa so khớp" ổn định, để hai chuỗi chỉ khác nhau về khoảng trắng (kể cả dư/thiếu
+ * 1 dấu cách ở giữa từ, kiểu "V-K300M" so với "V-K300 M") / kiểu dấu nháy / hoa-thường /
+ * ký tự ẩn vẫn được coi là CÙNG một sản phẩm.
  *
  * Dùng cho cột Product.nameKey / Product.unitKey — KHÔNG dùng để hiển thị.
+ * Cố ý bỏ TOÀN BỘ khoảng trắng (không chỉ gộp lại) vì nhà cung cấp gõ tay hay dư/thiếu
+ * đúng 1 dấu cách ở vị trí bất kỳ trong mã hàng, không chỉ cạnh dấu '-' hay '/'.
  */
 
 // Zero-width space, ZWNJ, ZWJ, word-joiner, BOM.
@@ -24,10 +27,6 @@ export function normalizeKey(input: string | null | undefined): string {
     .replace(SINGLE_QUOTES, "'")
     .replace(DOUBLE_QUOTES, '"')
     .replace(DASHES, "-")
-    .replace(/\s+/g, " ") // gộp mọi loại khoảng trắng (kể cả \n, \t, NBSP) thành 1 dấu cách
-    // Bỏ khoảng trắng bao quanh '-' và '/': nhà cung cấp gõ "4- port", "4 -port",
-    // "512E/ HPE", "512E /HPE"... cho cùng một nội dung.
-    .replace(/ ?([/-]) ?/g, "$1")
-    .trim()
+    .replace(/\s+/g, "") // bỏ toàn bộ khoảng trắng (mọi loại: \n, \t, NBSP...)
     .toLowerCase();
 }

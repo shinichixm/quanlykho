@@ -37,15 +37,21 @@ async function computeInventoryRows(
   const periodTo = parsed.periodTo ? toEndOfDayUtc(parsed.periodTo) : undefined;
   const periodFrom = parsed.periodFrom;
 
-  const { products, purchaseItems, saleItems, adjustments } = await findInventoryReportData({
-    keyword: parsed.keyword,
-    periodTo,
-  });
+  const { products, purchaseItems, saleItems, adjustments, substitutionsUsed } =
+    await findInventoryReportData({
+      keyword: parsed.keyword,
+      periodTo,
+    });
 
   const rows: InventoryRow[] = products.map((product) => {
     const pItems = purchaseItems.filter((item) => item.productId === product.id);
     const sItems = saleItems.filter((item) => item.productId === product.id);
     const productAdjustments = adjustments.filter((a) => a.productId === product.id);
+    // Hàng đã dùng làm sản phẩm thay thế khi bổ sung hóa đơn âm kho — trừ tồn
+    // giống 1 lần xuất, không ảnh hưởng giá vốn (giống negAdj).
+    const productSubstitutions = substitutionsUsed.filter(
+      (s) => s.substituteProductId === product.id
+    );
 
     // Phiếu điều chỉnh dương tính như 1 lần nhập (có ảnh hưởng giá vốn bình quân),
     // phiếu âm tính như 1 lần xuất (chỉ trừ số lượng, không đổi giá vốn).
@@ -74,12 +80,16 @@ async function computeInventoryRows(
         .reduce((sum, item) => sum + Number(item.quantity), 0) +
         negAdj
           .filter((a) => isBeforePeriod(a.adjustedAt))
-          .reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0));
+          .reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0) +
+        productSubstitutions
+          .filter((s) => isBeforePeriod(s.createdAt))
+          .reduce((sum, s) => sum + Number(s.quantity), 0));
 
     const inItems = pItems.filter((item) => !isBeforePeriod(item.invoice.issuedAt));
     const outItems = sItems.filter((item) => !isBeforePeriod(item.invoice.issuedAt));
     const inAdj = posAdj.filter((a) => !isBeforePeriod(a.adjustedAt));
     const outAdj = negAdj.filter((a) => !isBeforePeriod(a.adjustedAt));
+    const outSub = productSubstitutions.filter((s) => !isBeforePeriod(s.createdAt));
 
     const inQty =
       inItems.reduce((sum, item) => sum + Number(item.quantity), 0) +
@@ -89,7 +99,8 @@ async function computeInventoryRows(
       inAdj.reduce((sum, a) => sum + Number(a.quantity) * Number(a.unitPrice), 0);
     const outQty =
       outItems.reduce((sum, item) => sum + Number(item.quantity), 0) +
-      outAdj.reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0);
+      outAdj.reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0) +
+      outSub.reduce((sum, s) => sum + Number(s.quantity), 0);
 
     const openingValue = openingQty * avgCost;
     const outValue = outQty * avgCost;

@@ -9,9 +9,11 @@ import {
   deleteProduct,
   findProductByCode,
   findProductById,
+  findProductByNameKey,
   findProductList,
   updateProduct,
 } from "../repositories/product.repository";
+import { normalizeKey } from "../../../shared/lib/normalize-key";
 import type {
   ProductInput,
   ProductSearchInput,
@@ -34,12 +36,24 @@ export async function searchProduct(input: ProductSearchInput) {
 export async function createProductService(input: ProductInput) {
   const parsed = productInputSchema.parse(input);
 
-  const existed = await findProductByCode(parsed.code);
-  if (existed) {
+  const existedCode = await findProductByCode(parsed.code);
+  if (existedCode) {
     throw new Error(`Mã hàng "${parsed.code}" đã tồn tại`);
   }
 
-  return createProduct(parsed);
+  const nameKey = normalizeKey(parsed.name);
+  const unitKey = normalizeKey(parsed.unit);
+
+  // Chặn tạo trùng sản phẩm đã có (cùng tên đã chuẩn hóa) — tránh lặp lại lỗi
+  // tách sản phẩm mà hệ thống nạp hóa đơn gặp phải trước đây.
+  const existedName = await findProductByNameKey(nameKey);
+  if (existedName) {
+    throw new Error(
+      `Đã có sản phẩm cùng tên: "${existedName.name}" (mã ${existedName.code}). Dùng sản phẩm đó thay vì tạo mới.`
+    );
+  }
+
+  return createProduct({ ...parsed, nameKey, unitKey });
 }
 
 export async function updateProductService(
@@ -60,7 +74,12 @@ export async function updateProductService(
     }
   }
 
-  return updateProduct(id, parsed);
+  const keyUpdates = {
+    ...(parsed.name !== undefined ? { nameKey: normalizeKey(parsed.name) } : {}),
+    ...(parsed.unit !== undefined ? { unitKey: normalizeKey(parsed.unit) } : {}),
+  };
+
+  return updateProduct(id, { ...parsed, ...keyUpdates });
 }
 
 export async function deleteProductService(id: number) {

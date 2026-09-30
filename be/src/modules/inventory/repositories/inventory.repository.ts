@@ -25,13 +25,14 @@ export async function findInventoryReportData(params: {
 
   const productIds = products.map((product) => product.id);
   if (productIds.length === 0) {
-    return { products, purchaseItems: [], saleItems: [], adjustments: [] };
+    return { products, purchaseItems: [], saleItems: [], adjustments: [], substitutionsUsed: [] };
   }
 
   const issuedAtFilter = params.periodTo ? { issuedAt: { lte: params.periodTo } } : {};
   const adjustedAtFilter = params.periodTo ? { adjustedAt: { lte: params.periodTo } } : {};
+  const createdAtFilter = params.periodTo ? { createdAt: { lte: params.periodTo } } : {};
 
-  const [purchaseItems, saleItems, adjustments] = await Promise.all([
+  const [purchaseItems, saleItems, adjustments, substitutionsUsed] = await Promise.all([
     prisma.invoiceItem.findMany({
       where: {
         productId: { in: productIds },
@@ -60,9 +61,20 @@ export async function findInventoryReportData(params: {
       where: { productId: { in: productIds }, ...adjustedAtFilter },
       select: { productId: true, quantity: true, unitPrice: true, adjustedAt: true },
     }),
+    // Sản phẩm dùng làm hàng thay thế khi "bổ sung" hóa đơn âm kho (tra soát) bị trừ
+    // thẳng vào Inventory.quantity mà KHÔNG tạo InvoiceItem — phải cộng riêng vào đây
+    // để SL tồn trên báo cáo khớp với tồn kho thực tế dùng ở màn tra soát.
+    prisma.reconciliationSubstitution.findMany({
+      where: {
+        substituteProductId: { in: productIds },
+        status: "completed",
+        ...createdAtFilter,
+      },
+      select: { substituteProductId: true, quantity: true, createdAt: true },
+    }),
   ]);
 
-  return { products, purchaseItems, saleItems, adjustments };
+  return { products, purchaseItems, saleItems, adjustments, substitutionsUsed };
 }
 
 export function createInventoryAdjustment(input: {
@@ -71,12 +83,26 @@ export function createInventoryAdjustment(input: {
   unitPrice: Prisma.Decimal | number;
   note?: string | null;
 }) {
-  return prisma.inventoryAdjustment.create({
-    data: {
-      productId: input.productId,
-      quantity: input.quantity,
-      unitPrice: input.unitPrice,
-      note: input.note || null,
-    },
+  return prisma.$transaction(async (tx) => {
+    const adjustment = await tx.inventoryAdjustment.create({
+      data: {
+        productId: input.productId,
+        quantity: input.quantity,
+        unitPrice: input.unitPrice,
+        note: input.note || null,
+      },
+    });
+
+    // Đồng bộ luôn Inventory.quantity (tồn kho thời gian thực) — bảng này được
+    // dùng riêng ở màn tra soát hóa đơn (chọn sản phẩm thay thế còn hàng), nếu
+    // không cập nhật thì phiếu điều chỉnh chỉ đổi số trên báo cáo, không đổi
+    // được số sản phẩm hiện ra khi tìm hàng thay thế.
+    await tx.inventory.upsert({
+      where: { productId: input.productId },
+      create: { productId: input.productId, quantity: input.quantity },
+      update: { quantity: { increment: input.quantity } },
+    });
+
+    return adjustment;
   });
 }

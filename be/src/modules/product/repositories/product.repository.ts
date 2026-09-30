@@ -36,11 +36,18 @@ export function findProductByCode(code: string) {
   return prisma.product.findUnique({ where: { code } });
 }
 
-export function createProduct(input: ProductInput) {
+export function findProductByNameKey(nameKey: string) {
+  return prisma.product.findFirst({ where: { nameKey } });
+}
+
+export function createProduct(input: ProductInput & { nameKey: string; unitKey: string }) {
   return prisma.product.create({ data: input });
 }
 
-export function updateProduct(id: number, input: ProductUpdateInput) {
+export function updateProduct(
+  id: number,
+  input: ProductUpdateInput & { nameKey?: string; unitKey?: string }
+) {
   return prisma.product.update({ where: { id }, data: input });
 }
 

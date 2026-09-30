@@ -69,7 +69,7 @@ async function computeKeys(): Promise<{
 }
 
 async function recalcInventory(productId: number) {
-  const [inSum, outSum] = await Promise.all([
+  const [inSum, outSum, adjSum, subSum] = await Promise.all([
     prisma.invoiceItem.aggregate({
       _sum: { quantity: true },
       where: { productId, invoice: { type: "purchase" } },
@@ -78,11 +78,22 @@ async function recalcInventory(productId: number) {
       _sum: { quantity: true },
       where: { productId, invoice: { type: "sale" } },
     }),
+    prisma.inventoryAdjustment.aggregate({
+      _sum: { quantity: true },
+      where: { productId },
+    }),
+    // Hàng đã dùng làm sản phẩm thay thế khi bổ sung hóa đơn âm kho (tra soát).
+    prisma.reconciliationSubstitution.aggregate({
+      _sum: { quantity: true },
+      where: { substituteProductId: productId, status: "completed" },
+    }),
   ]);
 
   const totalIn = inSum._sum.quantity ?? new Prisma.Decimal(0);
   const totalOut = outSum._sum.quantity ?? new Prisma.Decimal(0);
-  const quantity = totalIn.minus(totalOut);
+  const totalAdj = adjSum._sum.quantity ?? new Prisma.Decimal(0);
+  const totalSub = subSum._sum.quantity ?? new Prisma.Decimal(0);
+  const quantity = totalIn.minus(totalOut).plus(totalAdj).minus(totalSub);
 
   if (!DRY_RUN) {
     await prisma.inventory.upsert({

@@ -5,7 +5,8 @@ import type { InventoryRow } from "../types/inventory.types";
 import { AddToCartModal } from "@/modules/cart/components/AddToCartModal";
 import { AdjustInventoryModal } from "./AdjustInventoryModal";
 import { useCart } from "@/modules/cart/hooks/useCart";
-import { EditIcon, PlusIcon } from "@/shared/ui/icons";
+import { deleteProductApi } from "../services/inventory.api";
+import { EditIcon, PlusIcon, TrashIcon } from "@/shared/ui/icons";
 
 function formatQty(value: string) {
   return Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
@@ -36,11 +37,26 @@ export function InventoryTable({
 }) {
   const [cartTarget, setCartTarget] = useState<InventoryRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<InventoryRow | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const { items: cartItems } = useCart();
   const cartProductIds = useMemo(
     () => new Set(cartItems.map((item) => item.productId)),
     [cartItems]
   );
+
+  async function handleDelete(row: InventoryRow) {
+    if (!window.confirm(`Xóa sản phẩm "${row.name}" (${row.code})?`)) return;
+
+    setDeletingId(row.productId);
+    try {
+      await deleteProductApi(row.productId);
+      onChanged?.();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Xóa sản phẩm thất bại");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -105,6 +121,15 @@ export function InventoryTable({
                     className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:border-blue-400 hover:text-blue-600"
                   >
                     <EditIcon width={12} height={12} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Xóa sản phẩm"
+                    onClick={() => handleDelete(row)}
+                    disabled={deletingId === row.productId}
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <TrashIcon width={12} height={12} />
                   </button>
                 </div>
               </td>

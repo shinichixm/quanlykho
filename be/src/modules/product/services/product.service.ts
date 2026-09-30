@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import {
   productInputSchema,
   productSearchSchema,
@@ -68,5 +69,14 @@ export async function deleteProductService(id: number) {
     throw new Error("Không tìm thấy sản phẩm");
   }
 
-  return deleteProduct(id);
+  try {
+    return await deleteProduct(id);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      throw new Error(
+        "Không thể xóa: sản phẩm đã có hóa đơn hoặc giao dịch tồn kho liên quan. Nếu đây là sản phẩm bị trùng, hãy gộp thay vì xóa."
+      );
+    }
+    throw error;
+  }
 }

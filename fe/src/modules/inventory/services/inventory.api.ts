@@ -63,6 +63,16 @@ export async function createProductApi(input: CreateProductInput) {
   return res.data;
 }
 
+export async function deleteProductApi(productId: number) {
+  const res = await fetcher<ApiEnvelope<null>>(`${API_BASE_URL}/api/product/${productId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error(res.message || "Không xóa được sản phẩm");
+  }
+}
+
 export type AdjustInventoryInput = {
   productId: number;
   quantity: number;

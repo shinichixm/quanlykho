@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import type { InventoryRow } from "../types/inventory.types";
 import { AddToCartModal } from "@/modules/cart/components/AddToCartModal";
+import { AdjustInventoryModal } from "./AdjustInventoryModal";
 import { useCart } from "@/modules/cart/hooks/useCart";
-import { PlusIcon } from "@/shared/ui/icons";
+import { EditIcon, PlusIcon } from "@/shared/ui/icons";
 
 function formatQty(value: string) {
   return Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
@@ -27,11 +28,14 @@ const STATUS_CLASS: Record<InventoryRow["status"], string> = {
 export function InventoryTable({
   rows,
   startIndex = 0,
+  onChanged,
 }: {
   rows: InventoryRow[];
   startIndex?: number;
+  onChanged?: () => void;
 }) {
   const [cartTarget, setCartTarget] = useState<InventoryRow | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<InventoryRow | null>(null);
   const { items: cartItems } = useCart();
   const cartProductIds = useMemo(
     () => new Set(cartItems.map((item) => item.productId)),
@@ -94,6 +98,14 @@ export function InventoryTable({
                   >
                     <PlusIcon width={12} height={12} />
                   </button>
+                  <button
+                    type="button"
+                    title="Điều chỉnh tồn kho / giá"
+                    onClick={() => setAdjustTarget(row)}
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:border-blue-400 hover:text-blue-600"
+                  >
+                    <EditIcon width={12} height={12} />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -111,6 +123,14 @@ export function InventoryTable({
             avgCost: cartTarget.avgCost,
           }}
           onClose={() => setCartTarget(null)}
+        />
+      )}
+
+      {adjustTarget && (
+        <AdjustInventoryModal
+          row={adjustTarget}
+          onClose={() => setAdjustTarget(null)}
+          onAdjusted={() => onChanged?.()}
         />
       )}
     </div>

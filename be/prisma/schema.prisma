@@ -38,6 +38,7 @@ model Product {
   invoiceItems  InvoiceItem[]
   stockTxns     StockTransaction[]
   inventory     Inventory?
+  adjustments   InventoryAdjustment[]
   substitutions ReconciliationSubstitution[] @relation("SubstituteProduct")
 
   // Prefix index (VarChar dài + utf8mb4 vượt giới hạn 3072 byte của khóa index).
@@ -128,6 +129,24 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id])
+}
+
+// Phiếu điều chỉnh tồn kho thủ công (VD: kiểm kê thực tế lệch số hệ thống).
+// quantity: dương = tăng tồn (tính như 1 lần nhập), âm = giảm tồn (tính như 1 lần xuất).
+// unitPrice chỉ dùng để tính lại giá vốn bình quân khi quantity dương; không ảnh
+// hưởng giá vốn khi quantity âm (giống logic hàng bán/hao hụt không đổi giá nhập).
+model InventoryAdjustment {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  quantity   Decimal  @db.Decimal(18, 3)
+  unitPrice  Decimal  @db.Decimal(18, 2) @default(0)
+  note       String?  @db.VarChar(500)
+  adjustedAt DateTime @default(now()) // mốc thời gian tính vào kỳ báo cáo, giống issuedAt của hóa đơn
+  createdAt  DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, adjustedAt])
 }
 
 // Thông tin công ty đang sử dụng phần mềm — dùng làm tiêu đề khi xuất báo cáo.

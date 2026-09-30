@@ -62,3 +62,27 @@ export async function createProductApi(input: CreateProductInput) {
 
   return res.data;
 }
+
+export type AdjustInventoryInput = {
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  note?: string;
+};
+
+export async function adjustInventoryApi(input: AdjustInventoryInput) {
+  const res = await fetcher<ApiEnvelope<{ id: number }>>(
+    `${API_BASE_URL}/api/inventory/adjustments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+
+  if (!res.ok || !res.data) {
+    throw new Error(res.message || "Không điều chỉnh được tồn kho");
+  }
+
+  return res.data;
+}

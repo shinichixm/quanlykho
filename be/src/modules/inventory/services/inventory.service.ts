@@ -1,7 +1,14 @@
 import { getCompanyInfoService } from "../../company/services/company.service";
 import { buildInventoryReportExcel } from "../lib/inventory-report-excel";
-import { findInventoryReportData } from "../repositories/inventory.repository";
-import { inventoryListQuerySchema } from "../schemas/inventory.schema";
+import {
+  createInventoryAdjustment,
+  findInventoryReportData,
+} from "../repositories/inventory.repository";
+import { findProductById } from "../../product/repositories/product.repository";
+import {
+  inventoryAdjustmentInputSchema,
+  inventoryListQuerySchema,
+} from "../schemas/inventory.schema";
 import type { InventoryListResult, InventoryRow, InventoryStatus } from "../types/inventory.types";
 
 type PeriodInput = {
@@ -30,7 +37,7 @@ async function computeInventoryRows(
   const periodTo = parsed.periodTo ? toEndOfDayUtc(parsed.periodTo) : undefined;
   const periodFrom = parsed.periodFrom;
 
-  const { products, purchaseItems, saleItems } = await findInventoryReportData({
+  const { products, purchaseItems, saleItems, adjustments } = await findInventoryReportData({
     keyword: parsed.keyword,
     periodTo,
   });
@@ -38,27 +45,51 @@ async function computeInventoryRows(
   const rows: InventoryRow[] = products.map((product) => {
     const pItems = purchaseItems.filter((item) => item.productId === product.id);
     const sItems = saleItems.filter((item) => item.productId === product.id);
+    const productAdjustments = adjustments.filter((a) => a.productId === product.id);
 
-    const totalPurchasedQty = pItems.reduce((sum, item) => sum + Number(item.quantity), 0);
-    const totalPurchasedAmount = pItems.reduce((sum, item) => sum + Number(item.amount), 0);
+    // Phiếu điều chỉnh dương tính như 1 lần nhập (có ảnh hưởng giá vốn bình quân),
+    // phiếu âm tính như 1 lần xuất (chỉ trừ số lượng, không đổi giá vốn).
+    const posAdj = productAdjustments.filter((a) => Number(a.quantity) > 0);
+    const negAdj = productAdjustments.filter((a) => Number(a.quantity) < 0);
+
+    const totalPurchasedQty =
+      pItems.reduce((sum, item) => sum + Number(item.quantity), 0) +
+      posAdj.reduce((sum, a) => sum + Number(a.quantity), 0);
+    const totalPurchasedAmount =
+      pItems.reduce((sum, item) => sum + Number(item.amount), 0) +
+      posAdj.reduce((sum, a) => sum + Number(a.quantity) * Number(a.unitPrice), 0);
     const avgCost = totalPurchasedQty > 0 ? totalPurchasedAmount / totalPurchasedQty : 0;
 
-    const isBeforePeriod = (issuedAt: Date) => (periodFrom ? issuedAt < periodFrom : false);
+    const isBeforePeriod = (at: Date) => (periodFrom ? at < periodFrom : false);
 
     const openingQty =
       pItems
         .filter((item) => isBeforePeriod(item.invoice.issuedAt))
-        .reduce((sum, item) => sum + Number(item.quantity), 0) -
-      sItems
+        .reduce((sum, item) => sum + Number(item.quantity), 0) +
+      posAdj
+        .filter((a) => isBeforePeriod(a.adjustedAt))
+        .reduce((sum, a) => sum + Number(a.quantity), 0) -
+      (sItems
         .filter((item) => isBeforePeriod(item.invoice.issuedAt))
-        .reduce((sum, item) => sum + Number(item.quantity), 0);
+        .reduce((sum, item) => sum + Number(item.quantity), 0) +
+        negAdj
+          .filter((a) => isBeforePeriod(a.adjustedAt))
+          .reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0));
 
     const inItems = pItems.filter((item) => !isBeforePeriod(item.invoice.issuedAt));
     const outItems = sItems.filter((item) => !isBeforePeriod(item.invoice.issuedAt));
+    const inAdj = posAdj.filter((a) => !isBeforePeriod(a.adjustedAt));
+    const outAdj = negAdj.filter((a) => !isBeforePeriod(a.adjustedAt));
 
-    const inQty = inItems.reduce((sum, item) => sum + Number(item.quantity), 0);
-    const inValue = inItems.reduce((sum, item) => sum + Number(item.amount), 0);
-    const outQty = outItems.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const inQty =
+      inItems.reduce((sum, item) => sum + Number(item.quantity), 0) +
+      inAdj.reduce((sum, a) => sum + Number(a.quantity), 0);
+    const inValue =
+      inItems.reduce((sum, item) => sum + Number(item.amount), 0) +
+      inAdj.reduce((sum, a) => sum + Number(a.quantity) * Number(a.unitPrice), 0);
+    const outQty =
+      outItems.reduce((sum, item) => sum + Number(item.quantity), 0) +
+      outAdj.reduce((sum, a) => sum + Math.abs(Number(a.quantity)), 0);
 
     const openingValue = openingQty * avgCost;
     const outValue = outQty * avgCost;
@@ -118,4 +149,15 @@ export async function exportInventoryReportExcelService(input: PeriodInput): Pro
     periodFrom,
     periodTo,
   });
+}
+
+export async function createInventoryAdjustmentService(input: unknown) {
+  const parsed = inventoryAdjustmentInputSchema.parse(input);
+
+  const product = await findProductById(parsed.productId);
+  if (!product) {
+    throw new Error("Không tìm thấy sản phẩm");
+  }
+
+  return createInventoryAdjustment(parsed);
 }

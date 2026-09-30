@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { fail, ok } from "../../../shared/lib/api-response";
 import { inventoryStatusSchema } from "../schemas/inventory.schema";
-import { exportInventoryReportExcelService, listInventoryService } from "../services/inventory.service";
+import {
+  createInventoryAdjustmentService,
+  exportInventoryReportExcelService,
+  listInventoryService,
+} from "../services/inventory.service";
 
 export const inventoryRouter = Router();
 
@@ -20,6 +24,17 @@ inventoryRouter.get("/", async (req, res) => {
     const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
 
     const result = await listInventoryService({ ...parseListQuery(req), page, pageSize });
+    return res.json(ok(result));
+  } catch (error) {
+    return res
+      .status(400)
+      .json(fail(error instanceof Error ? error.message : "Unknown error"));
+  }
+});
+
+inventoryRouter.post("/adjustments", async (req, res) => {
+  try {
+    const result = await createInventoryAdjustmentService(req.body || {});
     return res.json(ok(result));
   } catch (error) {
     return res

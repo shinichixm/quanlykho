@@ -25,12 +25,13 @@ export async function findInventoryReportData(params: {
 
   const productIds = products.map((product) => product.id);
   if (productIds.length === 0) {
-    return { products, purchaseItems: [], saleItems: [] };
+    return { products, purchaseItems: [], saleItems: [], adjustments: [] };
   }
 
   const issuedAtFilter = params.periodTo ? { issuedAt: { lte: params.periodTo } } : {};
+  const adjustedAtFilter = params.periodTo ? { adjustedAt: { lte: params.periodTo } } : {};
 
-  const [purchaseItems, saleItems] = await Promise.all([
+  const [purchaseItems, saleItems, adjustments] = await Promise.all([
     prisma.invoiceItem.findMany({
       where: {
         productId: { in: productIds },
@@ -55,7 +56,27 @@ export async function findInventoryReportData(params: {
         invoice: { select: { issuedAt: true } },
       },
     }),
+    prisma.inventoryAdjustment.findMany({
+      where: { productId: { in: productIds }, ...adjustedAtFilter },
+      select: { productId: true, quantity: true, unitPrice: true, adjustedAt: true },
+    }),
   ]);
 
-  return { products, purchaseItems, saleItems };
+  return { products, purchaseItems, saleItems, adjustments };
+}
+
+export function createInventoryAdjustment(input: {
+  productId: number;
+  quantity: Prisma.Decimal | number;
+  unitPrice: Prisma.Decimal | number;
+  note?: string | null;
+}) {
+  return prisma.inventoryAdjustment.create({
+    data: {
+      productId: input.productId,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      note: input.note || null,
+    },
+  });
 }

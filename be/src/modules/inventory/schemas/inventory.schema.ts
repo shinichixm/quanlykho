@@ -10,3 +10,11 @@ export const inventoryListQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(10000).default(50),
 });
+
+// Phiếu điều chỉnh tồn kho: quantity dương = tăng tồn, âm = giảm tồn.
+export const inventoryAdjustmentInputSchema = z.object({
+  productId: z.number().int().positive(),
+  quantity: z.number().refine((v) => v !== 0, "Số lượng chênh lệch không được bằng 0"),
+  unitPrice: z.number().min(0).default(0),
+  note: z.string().max(500).optional(),
+});

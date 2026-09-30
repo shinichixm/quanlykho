@@ -151,7 +151,7 @@ export default function InventoryPage() {
           />
         ) : (
           <>
-            <InventoryTable rows={rows} startIndex={(page - 1) * pageSize} />
+            <InventoryTable rows={rows} startIndex={(page - 1) * pageSize} onChanged={refetch} />
             <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
           </>
         )}

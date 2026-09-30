@@ -42,3 +42,23 @@ export async function exportInventoryExcelApi(query: InventoryQuery) {
     "bao-cao-nhap-xuat-ton.xlsx"
   );
 }
+
+export type CreateProductInput = {
+  code: string;
+  name: string;
+  unit: string;
+};
+
+export async function createProductApi(input: CreateProductInput) {
+  const res = await fetcher<ApiEnvelope<{ id: number }>>(`${API_BASE_URL}/api/product`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok || !res.data) {
+    throw new Error(res.message || "Không thêm được sản phẩm");
+  }
+
+  return res.data;
+}

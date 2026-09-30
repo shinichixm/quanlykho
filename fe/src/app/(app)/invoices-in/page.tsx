@@ -48,6 +48,7 @@ export default function InvoicesInPage() {
     confirming,
     confirmError,
     selectFiles,
+    removeFile,
     cancel,
     confirm,
   } = useInvoiceImport("purchase", refetch);
@@ -140,6 +141,7 @@ export default function InvoicesInPage() {
           confirmError={confirmError}
           onCancel={cancel}
           onConfirm={confirm}
+          onRemove={removeFile}
         />
       )}
 

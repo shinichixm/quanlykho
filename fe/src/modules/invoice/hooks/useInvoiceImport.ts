@@ -30,6 +30,11 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
     }
   }
 
+  function removeFile(fileName: string) {
+    setFiles((prev) => prev.filter((f) => f.name !== fileName));
+    setPreviewRows((prev) => (prev ? prev.filter((r) => r.fileName !== fileName) : prev));
+  }
+
   function cancel() {
     setFiles([]);
     setPreviewRows(null);
@@ -71,6 +76,7 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
     confirming,
     confirmError,
     selectFiles,
+    removeFile,
     cancel,
     confirm,
   };

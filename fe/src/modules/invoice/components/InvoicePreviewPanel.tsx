@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/shared/ui/Card";
 import { Button } from "@/shared/ui/Button";
-import { BuildingIcon, ChevronRightIcon } from "@/shared/ui/icons";
+import { BuildingIcon, ChevronRightIcon, TrashIcon } from "@/shared/ui/icons";
 import type { PreviewInvoiceRow } from "../types/invoice.types";
 
 function formatCurrency(value: number | null) {
@@ -50,12 +50,14 @@ export function InvoicePreviewPanel({
   confirmError,
   onCancel,
   onConfirm,
+  onRemove,
 }: {
   rows: PreviewInvoiceRow[];
   confirming: boolean;
   confirmError: string;
   onCancel: () => void;
   onConfirm: () => void;
+  onRemove: (fileName: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { groups, invalid } = useMemo(() => groupByPartner(rows), [rows]);
@@ -96,10 +98,20 @@ export function InvoicePreviewPanel({
         {invalid.length > 0 && (
           <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
             <div className="font-medium">{invalid.length} file không đọc được:</div>
-            <ul className="mt-1 list-inside list-disc">
+            <ul className="mt-1 flex flex-col gap-1">
               {invalid.map((row) => (
-                <li key={row.fileName}>
-                  {row.fileName}: {row.error}
+                <li key={row.fileName} className="flex items-center justify-between gap-2">
+                  <span>
+                    {row.fileName}: {row.error}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(row.fileName)}
+                    title="Bỏ file này khỏi danh sách nạp"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-red-200 text-red-500 hover:bg-red-100"
+                  >
+                    <TrashIcon width={12} height={12} />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -130,12 +142,12 @@ export function InvoicePreviewPanel({
                       key={key}
                       className="overflow-hidden rounded-lg border border-slate-200"
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggle(key)}
-                        className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-2.5 text-left text-sm hover:bg-slate-100"
-                      >
-                        <div className="flex items-center gap-2">
+                      <div className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-2.5 text-sm hover:bg-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => toggle(key)}
+                          className="flex flex-1 items-center gap-2 text-left"
+                        >
                           <ChevronRightIcon
                             width={14}
                             height={14}
@@ -150,14 +162,22 @@ export function InvoicePreviewPanel({
                           <span className="text-slate-400">
                             {formatDate(invoice.issuedAt)}
                           </span>
-                        </div>
+                        </button>
                         <div className="flex items-center gap-3 text-slate-500">
                           <span>{invoice.items.length} mặt hàng</span>
                           <span className="font-medium text-slate-800">
                             {formatCurrency(invoice.totalAmount)}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => onRemove(invoice.fileName)}
+                            title="Bỏ hóa đơn này khỏi danh sách nạp"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-400 hover:border-red-400 hover:text-red-600"
+                          >
+                            <TrashIcon width={12} height={12} />
+                          </button>
                         </div>
-                      </button>
+                      </div>
 
                       {isOpen && (
                         <table className="w-full text-sm">

@@ -6,9 +6,10 @@ import { Card } from "@/shared/ui/Card";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Pagination } from "@/shared/ui/Pagination";
 import { Button } from "@/shared/ui/Button";
-import { BoxIcon, DownloadIcon } from "@/shared/ui/icons";
+import { BoxIcon, DownloadIcon, PlusIcon } from "@/shared/ui/icons";
 import { useInventoryList } from "@/modules/inventory/hooks/useInventoryList";
 import { InventoryTable } from "@/modules/inventory/components/InventoryTable";
+import { AddProductModal } from "@/modules/inventory/components/AddProductModal";
 import { exportInventoryExcelApi } from "@/modules/inventory/services/inventory.api";
 import type { InventoryStatus } from "@/modules/inventory/types/inventory.types";
 
@@ -36,10 +37,12 @@ export default function InventoryPage() {
     periodTo,
     loading,
     error,
+    refetch,
   } = useInventoryList();
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [addingProduct, setAddingProduct] = useState(false);
 
   async function handleExport() {
     setExporting(true);
@@ -59,12 +62,22 @@ export default function InventoryPage() {
         title="Tồn kho"
         description="Báo cáo nhập - xuất - tồn theo sản phẩm và theo kỳ"
         actions={
-          <Button variant="secondary" onClick={handleExport} disabled={exporting || total === 0}>
-            <DownloadIcon width={14} height={14} />
-            {exporting ? "Đang xuất..." : "Xuất Excel"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={handleExport} disabled={exporting || total === 0}>
+              <DownloadIcon width={14} height={14} />
+              {exporting ? "Đang xuất..." : "Xuất Excel"}
+            </Button>
+            <Button onClick={() => setAddingProduct(true)}>
+              <PlusIcon width={14} height={14} />
+              Thêm sản phẩm
+            </Button>
+          </div>
         }
       />
+
+      {addingProduct && (
+        <AddProductModal onClose={() => setAddingProduct(false)} onCreated={refetch} />
+      )}
 
       {exportError && (
         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">

@@ -5,9 +5,9 @@ export async function findInventoryReportData(params: {
   keyword?: string;
   periodTo?: Date;
 }) {
-  // Danh sách tồn kho chỉ gồm những sản phẩm đã từng nhập kho (có hóa đơn mua vào).
+  // Hiển thị tất cả sản phẩm (kể cả sản phẩm mới thêm thủ công chưa có giao dịch,
+  // hoặc lỡ bị bán trước khi có hóa đơn mua vào) — không chỉ những sản phẩm đã nhập kho.
   const where: Prisma.ProductWhereInput = {
-    stockTxns: { some: { type: "in" } },
     ...(params.keyword
       ? {
           OR: [

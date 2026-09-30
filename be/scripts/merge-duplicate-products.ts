@@ -145,6 +145,10 @@ async function mergeDuplicates(
           where: { substituteProductId: dupId },
           data: { substituteProductId: canonical.id },
         });
+        await tx.inventoryAdjustment.updateMany({
+          where: { productId: dupId },
+          data: { productId: canonical.id },
+        });
         await tx.inventory.deleteMany({ where: { productId: dupId } });
         await tx.product.delete({ where: { id: dupId } });
       }

@@ -2,16 +2,19 @@
  * Don du lieu san pham bi tach do so khop ten theo chuoi goc.
  *
  *   1. Tinh lai Product.nameKey / Product.unitKey theo normalizeKey().
- *   2. Gop cac san pham cung (nameKey, unitKey): giu id nho nhat lam chuan,
- *      tro toan bo InvoiceItem / StockTransaction / ReconciliationSubstitution
- *      ve id chuan, roi xoa ban ghi thua.
+ *   2. Gop cac san pham CUNG TEN (nameKey) - khong xet don vi tinh, vi cung 1
+ *      mat hang nhung don vi ghi khac nhau giua cac hoa don van la 1 san pham.
+ *      Giu id nho nhat lam chuan, tro toan bo InvoiceItem / StockTransaction /
+ *      ReconciliationSubstitution ve id chuan, roi xoa ban ghi thua.
  *   3. Tinh lai ton kho (Inventory) cua san pham chuan = tong SL mua - tong SL ban
  *      theo hoa don, de so ton khop dung voi chung tu.
  *
  * Chay:  npm run fix:products              (thuc thi)
  *        npm run fix:products -- --dry     (chi in ra, khong doi du lieu)
  *
- * Idempotent: chay lai nhieu lan van an toan.
+ * Idempotent: chay lai nhieu lan van an toan. Ca hai che do deu gom nhom theo
+ * key vua tinh lai trong bo nho (khong doc lai DB) nen --dry phan anh dung
+ * ket qua se xay ra khi chay that.
  */
 import { Prisma, PrismaClient } from "@prisma/client";
 import { normalizeKey } from "../src/shared/lib/normalize-key";
@@ -24,15 +27,32 @@ function log(...args: unknown[]) {
   console.log(...args);
 }
 
-async function recomputeKeys() {
+type ProductRow = {
+  id: number;
+  code: string;
+  name: string;
+  unit: string;
+  nameKey: string;
+  unitKey: string;
+};
+
+async function computeKeys(): Promise<{
+  products: ProductRow[];
+  freshNameKey: Map<number, string>;
+}> {
   const products = await prisma.product.findMany({
-    select: { id: true, name: true, unit: true, nameKey: true, unitKey: true },
+    select: { id: true, code: true, name: true, unit: true, nameKey: true, unitKey: true },
+    orderBy: { id: "asc" },
   });
 
+  const freshNameKey = new Map<number, string>();
   let updated = 0;
+
   for (const p of products) {
     const nameKey = normalizeKey(p.name);
     const unitKey = normalizeKey(p.unit);
+    freshNameKey.set(p.id, nameKey);
+
     if (nameKey === p.nameKey && unitKey === p.unitKey) continue;
 
     updated += 1;
@@ -43,7 +63,9 @@ async function recomputeKeys() {
       });
     }
   }
+
   log(`Chuan hoa khoa: ${updated}/${products.length} san pham can cap nhat.`);
+  return { products, freshNameKey };
 }
 
 async function recalcInventory(productId: number) {
@@ -72,15 +94,13 @@ async function recalcInventory(productId: number) {
   return quantity;
 }
 
-async function mergeDuplicates() {
-  const products = await prisma.product.findMany({
-    select: { id: true, code: true, name: true, nameKey: true, unitKey: true },
-    orderBy: { id: "asc" },
-  });
-
-  const groups = new Map<string, typeof products>();
+async function mergeDuplicates(
+  products: ProductRow[],
+  freshNameKey: Map<number, string>
+) {
+  const groups = new Map<string, ProductRow[]>();
   for (const p of products) {
-    const key = `${p.nameKey}${p.unitKey}`;
+    const key = freshNameKey.get(p.id)!;
     const arr = groups.get(key);
     if (arr) arr.push(p);
     else groups.set(key, [p]);
@@ -130,8 +150,8 @@ async function main() {
       : "== Bat dau don du lieu =="
   );
 
-  await recomputeKeys();
-  const dupGroups = await mergeDuplicates();
+  const { products, freshNameKey } = await computeKeys();
+  const dupGroups = await mergeDuplicates(products, freshNameKey);
 
   const canonicalIds = dupGroups.map((g) => g[0].id);
   for (const id of canonicalIds) {

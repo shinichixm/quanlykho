@@ -50,11 +50,13 @@ export async function importInvoiceTransaction(
         const nameKey = normalizeKey(item.name);
         const unitKey = normalizeKey(item.unit);
 
-        // So khớp theo khóa đã chuẩn hóa: tên hàng ở hóa đơn mua vào và bán ra
-        // thường lệch nhau vài khoảng trắng / ký tự xuống dòng / hoa-thường,
-        // nếu so bằng chuỗi gốc sẽ tạo sản phẩm trùng và làm sai tồn kho.
+        // So khớp CHỈ theo tên hàng đã chuẩn hóa (không xét đơn vị tính — cùng
+        // một mặt hàng nhưng đơn vị ghi khác nhau giữa các hóa đơn vẫn coi là
+        // 1 sản phẩm). Tên hàng ở hóa đơn mua vào và bán ra thường lệch nhau vài
+        // khoảng trắng / xuống dòng / hoa-thường, so bằng chuỗi gốc sẽ tạo sản
+        // phẩm trùng và làm sai tồn kho.
         let product = await tx.product.findFirst({
-          where: { nameKey, unitKey },
+          where: { nameKey },
           orderBy: { id: "asc" },
         });
 

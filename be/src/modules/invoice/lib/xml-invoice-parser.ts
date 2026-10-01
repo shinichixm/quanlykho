@@ -128,10 +128,16 @@ export function parseInvoiceXml(xml: string, type: InvoiceType): ParsedInvoice {
   if (!issuedAtRaw) throw new Error("Không tìm thấy ngày lập hóa đơn (NLap) trong file XML");
 
   const rawPartnerTaxCode = text(findFirst(partnerNode, "MST"));
+  // Hóa đơn bán lẻ cho khách cá nhân thường không có "Ten" (tên đơn vị/công ty)
+  // mà chỉ có "HVTNMHang" (họ tên người mua hàng) — dùng tạm tên này nếu thiếu Ten.
+  const rawPartnerName =
+    text(findFirst(partnerNode, "Ten")) || text(findFirst(partnerNode, "HVTNMHang"));
   // Giới hạn độ dài để không vượt quá kích thước cột trong DB (xem schema.prisma).
-  const partnerName = text(findFirst(partnerNode, "Ten")).slice(0, 500);
+  const partnerName = rawPartnerName.slice(0, 500);
 
-  if (!partnerName) throw new Error("Không tìm thấy tên đối tác (Ten) trong file XML");
+  if (!partnerName) {
+    throw new Error("Không tìm thấy tên đối tác (Ten/HVTNMHang) trong file XML");
+  }
 
   const partnerTaxCodeMissing = !rawPartnerTaxCode;
   const partnerTaxCode = rawPartnerTaxCode || generatePlaceholderTaxCode(partnerName);

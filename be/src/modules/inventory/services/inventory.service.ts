@@ -139,9 +139,13 @@ export async function listInventoryService(
   const pageSize = input.pageSize ?? 50;
   const start = (page - 1) * pageSize;
 
+  // Tổng theo TOÀN BỘ danh sách đã lọc (không chỉ trang đang xem).
+  const totalValue = rows.reduce((sum, row) => sum + Number(row.closingValue), 0);
+
   return {
     rows: rows.slice(start, start + pageSize),
     total: rows.length,
+    totalValue: totalValue.toString(),
   };
 }
 

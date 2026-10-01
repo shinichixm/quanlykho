@@ -20,4 +20,7 @@ export type InventoryRow = {
 export type InventoryListResult = {
   rows: InventoryRow[];
   total: number;
+  // Tổng giá trị tồn kho (closingValue) của TOÀN BỘ sản phẩm khớp bộ lọc hiện tại
+  // (không chỉ trang đang xem).
+  totalValue: string;
 };

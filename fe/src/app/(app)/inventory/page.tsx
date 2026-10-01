@@ -13,6 +13,10 @@ import { AddProductModal } from "@/modules/inventory/components/AddProductModal"
 import { exportInventoryExcelApi } from "@/modules/inventory/services/inventory.api";
 import type { InventoryStatus } from "@/modules/inventory/types/inventory.types";
 
+function formatCurrency(value: string) {
+  return Number(value).toLocaleString("vi-VN") + " đ";
+}
+
 const STATUS_TABS: { value: InventoryStatus | undefined; label: string }[] = [
   { value: undefined, label: "Tất cả" },
   { value: "in_stock", label: "Còn hàng" },
@@ -23,6 +27,7 @@ export default function InventoryPage() {
   const {
     rows,
     total,
+    totalValue,
     page,
     pageSize,
     setPage,
@@ -118,6 +123,11 @@ export default function InventoryPage() {
               Xóa kỳ
             </Button>
           )}
+        </div>
+
+        <div className="flex flex-col items-end justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-xs font-medium text-slate-500">Tổng tiền hàng tồn</span>
+          <span className="text-lg font-semibold text-blue-600">{formatCurrency(totalValue)}</span>
         </div>
 
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">

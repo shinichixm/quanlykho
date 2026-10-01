@@ -9,6 +9,7 @@ const PAGE_SIZE = 20;
 export function useInventoryList() {
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalValue, setTotalValue] = useState("0");
   const [page, setPage] = useState(1);
   const [keyword, setKeywordState] = useState("");
   const [status, setStatusState] = useState<InventoryStatus | undefined>(undefined);
@@ -31,6 +32,7 @@ export function useInventoryList() {
       );
       setRows(result.rows);
       setTotal(result.total);
+      setTotalValue(result.totalValue);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
@@ -61,6 +63,7 @@ export function useInventoryList() {
   return {
     rows,
     total,
+    totalValue,
     page,
     pageSize: PAGE_SIZE,
     setPage,

@@ -24,9 +24,9 @@ function buildParams(query: InventoryQuery, extra: Record<string, string>) {
 export async function listInventoryApi(query: InventoryQuery, page = 1, pageSize = 50) {
   const params = buildParams(query, { page: String(page), pageSize: String(pageSize) });
 
-  const res = await fetcher<ApiEnvelope<{ rows: InventoryRow[]; total: number }>>(
-    `${API_BASE_URL}/api/inventory?${params.toString()}`
-  );
+  const res = await fetcher<
+    ApiEnvelope<{ rows: InventoryRow[]; total: number; totalValue: string }>
+  >(`${API_BASE_URL}/api/inventory?${params.toString()}`);
 
   if (!res.ok || !res.data) {
     throw new Error(res.message || "Không tải được danh sách tồn kho");

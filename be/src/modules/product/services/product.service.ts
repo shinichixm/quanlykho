@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
 import {
   productInputSchema,
   productSearchSchema,
@@ -13,12 +14,21 @@ import {
   findProductList,
   updateProduct,
 } from "../repositories/product.repository";
+import { createInventoryAdjustment } from "../../inventory/repositories/inventory.repository";
 import { normalizeKey } from "../../../shared/lib/normalize-key";
+import {
+  parseProductImportExcel,
+  type ParsedProductImportRow,
+} from "../lib/product-import-excel";
 import type {
   ProductInput,
   ProductSearchInput,
   ProductUpdateInput,
 } from "../types/product.types";
+
+function generateProductCode() {
+  return `AUTO-${randomBytes(4).toString("hex").toUpperCase()}`;
+}
 
 export async function searchProduct(input: ProductSearchInput) {
   const parsed = productSearchSchema.parse(input);
@@ -98,4 +108,102 @@ export async function deleteProductService(id: number) {
     }
     throw error;
   }
+}
+
+export type ProductImportPreviewRow = ParsedProductImportRow & {
+  existingProductId: number | null;
+  existingProductCode: string | null;
+};
+
+export async function previewProductImportExcelService(
+  buffer: Buffer
+): Promise<ProductImportPreviewRow[]> {
+  const rows = await parseProductImportExcel(buffer);
+  const results: ProductImportPreviewRow[] = [];
+
+  for (const row of rows) {
+    if (row.error) {
+      results.push({ ...row, existingProductId: null, existingProductCode: null });
+      continue;
+    }
+
+    const existing = await findProductByNameKey(normalizeKey(row.name));
+    results.push({
+      ...row,
+      existingProductId: existing?.id ?? null,
+      existingProductCode: existing?.code ?? null,
+    });
+  }
+
+  return results;
+}
+
+export type ProductImportResultRow = {
+  rowIndex: number;
+  name: string;
+  success: boolean;
+  created: boolean;
+  error: string | null;
+};
+
+export async function importProductsFromExcelService(
+  buffer: Buffer
+): Promise<ProductImportResultRow[]> {
+  const rows = await parseProductImportExcel(buffer);
+  const results: ProductImportResultRow[] = [];
+
+  for (const row of rows) {
+    if (row.error) {
+      results.push({
+        rowIndex: row.rowIndex,
+        name: row.name,
+        success: false,
+        created: false,
+        error: row.error,
+      });
+      continue;
+    }
+
+    try {
+      const nameKey = normalizeKey(row.name);
+      const unitKey = normalizeKey(row.unit);
+
+      // Trùng tên (đã chuẩn hóa) với sản phẩm có sẵn -> cộng vào tồn kho sản phẩm
+      // đó thay vì tạo bản trùng mới, giống logic nạp hóa đơn.
+      let product = await findProductByNameKey(nameKey);
+      let created = false;
+
+      if (!product) {
+        product = await createProduct({
+          code: generateProductCode(),
+          name: row.name,
+          unit: row.unit,
+          nameKey,
+          unitKey,
+        });
+        created = true;
+      }
+
+      if (row.quantity !== 0) {
+        await createInventoryAdjustment({
+          productId: product.id,
+          quantity: row.quantity,
+          unitPrice: row.unitPrice,
+          note: "Nhập sản phẩm từ Excel",
+        });
+      }
+
+      results.push({ rowIndex: row.rowIndex, name: row.name, success: true, created, error: null });
+    } catch (error) {
+      results.push({
+        rowIndex: row.rowIndex,
+        name: row.name,
+        success: false,
+        created: false,
+        error: error instanceof Error ? error.message : "Lỗi không xác định",
+      });
+    }
+  }
+
+  return results;
 }

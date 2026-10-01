@@ -1,16 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { Card } from "@/shared/ui/Card";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Pagination } from "@/shared/ui/Pagination";
 import { Button } from "@/shared/ui/Button";
-import { BoxIcon, DownloadIcon, PlusIcon } from "@/shared/ui/icons";
+import { BoxIcon, DownloadIcon, PlusIcon, UploadIcon } from "@/shared/ui/icons";
 import { useInventoryList } from "@/modules/inventory/hooks/useInventoryList";
+import { useProductImport } from "@/modules/inventory/hooks/useProductImport";
 import { InventoryTable } from "@/modules/inventory/components/InventoryTable";
 import { AddProductModal } from "@/modules/inventory/components/AddProductModal";
-import { exportInventoryExcelApi } from "@/modules/inventory/services/inventory.api";
+import { ProductImportPanel } from "@/modules/inventory/components/ProductImportPanel";
+import {
+  downloadProductImportTemplateApi,
+  exportInventoryExcelApi,
+} from "@/modules/inventory/services/inventory.api";
 import type { InventoryStatus } from "@/modules/inventory/types/inventory.types";
 
 function formatCurrency(value: string) {
@@ -48,6 +53,29 @@ export default function InventoryPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [addingProduct, setAddingProduct] = useState(false);
+  const [templateError, setTemplateError] = useState("");
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    previewRows,
+    loadingPreview,
+    previewError,
+    confirming,
+    confirmError,
+    confirmResults,
+    selectFile,
+    cancel: cancelImport,
+    confirm: confirmImport,
+  } = useProductImport(refetch);
+
+  async function handleDownloadTemplate() {
+    setTemplateError("");
+    try {
+      await downloadProductImportTemplateApi();
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : "Tải file mẫu thất bại");
+    }
+  }
 
   async function handleExport() {
     setExporting(true);
@@ -72,6 +100,25 @@ export default function InventoryPage() {
               <DownloadIcon width={14} height={14} />
               {exporting ? "Đang xuất..." : "Xuất Excel"}
             </Button>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) selectFile(file);
+              }}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => importFileInputRef.current?.click()}
+              disabled={loadingPreview}
+            >
+              <UploadIcon width={14} height={14} />
+              {loadingPreview ? "Đang xem trước..." : "Nhập Excel"}
+            </Button>
             <Button onClick={() => setAddingProduct(true)}>
               <PlusIcon width={14} height={14} />
               Thêm sản phẩm
@@ -84,10 +131,38 @@ export default function InventoryPage() {
         <AddProductModal onClose={() => setAddingProduct(false)} onCreated={refetch} />
       )}
 
+      <div className="mb-4 -mt-2 flex items-center justify-end gap-3 text-xs">
+        {templateError && <span className="text-red-600">{templateError}</span>}
+        <button
+          type="button"
+          onClick={handleDownloadTemplate}
+          className="font-medium text-blue-600 hover:underline"
+        >
+          Tải file mẫu nhập Excel
+        </button>
+      </div>
+
       {exportError && (
         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
           {exportError}
         </div>
+      )}
+
+      {previewError && (
+        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+          {previewError}
+        </div>
+      )}
+
+      {previewRows && (
+        <ProductImportPanel
+          rows={previewRows}
+          confirming={confirming}
+          confirmError={confirmError}
+          confirmResults={confirmResults}
+          onCancel={cancelImport}
+          onConfirm={confirmImport}
+        />
       )}
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

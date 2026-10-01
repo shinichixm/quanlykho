@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/shared/ui/Button";
+import { SearchableSelect } from "@/shared/ui/SearchableSelect";
 import type { InvoicePartnerOption } from "../types/invoice.types";
 
 type Props = {
@@ -57,18 +58,15 @@ export function InvoiceDateFilter({
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
         Công ty
-        <select
-          value={partnerId ?? ""}
-          onChange={(e) => onPartnerChange(e.target.value ? Number(e.target.value) : undefined)}
-          className="min-w-[220px] rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
-        >
-          <option value="">Tất cả công ty</option>
-          {partners.map((partner) => (
-            <option key={partner.id} value={partner.id}>
-              {partner.name}
-            </option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={partners}
+          value={partnerId}
+          onChange={onPartnerChange}
+          getLabel={(partner) => partner.name}
+          getValue={(partner) => partner.id}
+          placeholder="Tất cả công ty"
+          className="min-w-[260px]"
+        />
       </label>
       <Button variant="secondary" onClick={handleApply}>
         Lọc

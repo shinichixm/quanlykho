@@ -4,6 +4,7 @@ import { prisma } from "../../../shared/db/prisma";
 import { normalizeKey } from "../../../shared/lib/normalize-key";
 import type {
   ImportInvoiceResult,
+  InvoiceCategory,
   InvoiceType,
   ParsedInvoice,
 } from "../types/invoice.types";
@@ -14,7 +15,8 @@ function generateProductCode() {
 
 export async function importInvoiceTransaction(
   parsed: ParsedInvoice,
-  type: InvoiceType
+  type: InvoiceType,
+  category: InvoiceCategory = "goods"
 ): Promise<ImportInvoiceResult> {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -35,6 +37,7 @@ export async function importInvoiceTransaction(
       const invoice = await tx.invoice.create({
         data: {
           type,
+          category,
           invoiceNo: parsed.invoiceNo,
           invoiceSeries: parsed.invoiceSeries,
           issuedAt: parsed.issuedAt,
@@ -43,6 +46,31 @@ export async function importInvoiceTransaction(
           status: "processed",
         },
       });
+
+      // Hóa đơn được phân loại "chi phí" khi nạp: lưu dòng hàng vào CostItem,
+      // KHÔNG tạo/so khớp Product, không đụng StockTransaction/Inventory —
+      // tránh lặp lại việc chi phí (thi công, dịch vụ...) bị lẫn vào hàng tồn kho.
+      if (category === "cost") {
+        for (const item of parsed.items) {
+          await tx.costItem.create({
+            data: {
+              invoiceId: invoice.id,
+              name: item.name,
+              unit: item.unit,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              amount: item.amount,
+            },
+          });
+        }
+
+        return {
+          invoiceId: invoice.id,
+          invoiceNo: invoice.invoiceNo,
+          itemCount: parsed.items.length,
+          createdProductCount: 0,
+        };
+      }
 
       let createdProductCount = 0;
 
@@ -124,6 +152,7 @@ export async function importInvoiceTransaction(
 
 export async function findInvoiceList(params: {
   type: InvoiceType;
+  category?: InvoiceCategory;
   skip: number;
   take: number;
   dateFrom?: Date;
@@ -133,6 +162,7 @@ export async function findInvoiceList(params: {
 }) {
   const where: Prisma.InvoiceWhereInput = {
     type: params.type,
+    ...(params.category ? { category: params.category } : {}),
     ...(params.partnerId ? { partnerId: params.partnerId } : {}),
     ...(params.dateFrom || params.dateTo
       ? {
@@ -187,6 +217,7 @@ export function findInvoiceDetailById(id: number) {
     include: {
       partner: true,
       items: { include: { product: true } },
+      costItems: true,
     },
   });
 }
@@ -217,6 +248,7 @@ async function deleteInvoicesByIdsInTx(
 
     await tx.stockTransaction.deleteMany({ where: { invoiceId: invoice.id } });
     await tx.invoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
+    await tx.costItem.deleteMany({ where: { invoiceId: invoice.id } });
   }
 
   await tx.invoice.deleteMany({ where: { id: { in: invoices.map((i) => i.id) } } });

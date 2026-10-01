@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 export const invoiceTypeSchema = z.enum(["purchase", "sale"]);
+export const invoiceCategorySchema = z.enum(["goods", "cost"]);
 
 export const invoiceListQuerySchema = z.object({
   type: invoiceTypeSchema,
+  category: invoiceCategorySchema.optional(),
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(100).default(20),
   dateFrom: z.coerce.date().optional(),

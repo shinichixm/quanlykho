@@ -1,8 +1,10 @@
 export type InvoiceType = "purchase" | "sale";
+export type InvoiceCategory = "goods" | "cost";
 
 export type InvoiceListItem = {
   id: number;
   type: InvoiceType;
+  category: InvoiceCategory;
   invoiceNo: string;
   invoiceSeries: string | null;
   issuedAt: string;
@@ -59,6 +61,7 @@ export type InvoiceDetailItem = {
 export type InvoiceDetail = {
   id: number;
   type: InvoiceType;
+  category: InvoiceCategory;
   invoiceNo: string;
   invoiceSeries: string | null;
   issuedAt: string;

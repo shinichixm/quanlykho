@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { confirmInvoicesApi, previewInvoicesApi } from "../services/invoice.api";
-import type { InvoiceType, PreviewInvoiceRow } from "../types/invoice.types";
+import type { InvoiceCategory, InvoiceType, PreviewInvoiceRow } from "../types/invoice.types";
 
 export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
   const [files, setFiles] = useState<File[]>([]);
@@ -11,6 +11,8 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
   const [previewError, setPreviewError] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
+  // Phân loại từng hóa đơn chọn ở bước xem trước: mặc định "goods" (hàng hóa).
+  const [categories, setCategories] = useState<Record<string, InvoiceCategory>>({});
 
   async function selectFiles(selected: File[]) {
     if (selected.length === 0) return;
@@ -18,6 +20,7 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
     setFiles(selected);
     setPreviewRows(null);
     setConfirmError("");
+    setCategories({});
     setLoadingPreview(true);
     setPreviewError("");
     try {
@@ -33,6 +36,14 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
   function removeFile(fileName: string) {
     setFiles((prev) => prev.filter((f) => f.name !== fileName));
     setPreviewRows((prev) => (prev ? prev.filter((r) => r.fileName !== fileName) : prev));
+    setCategories((prev) => {
+      const { [fileName]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }
+
+  function setCategory(fileName: string, category: InvoiceCategory) {
+    setCategories((prev) => ({ ...prev, [fileName]: category }));
   }
 
   function cancel() {
@@ -40,13 +51,14 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
     setPreviewRows(null);
     setPreviewError("");
     setConfirmError("");
+    setCategories({});
   }
 
   async function confirm() {
     setConfirming(true);
     setConfirmError("");
     try {
-      const results = await confirmInvoicesApi(files, type);
+      const results = await confirmInvoicesApi(files, type, categories);
       const failed = results.filter((r) => !r.success);
       const succeeded = results.filter((r) => r.success);
 
@@ -75,6 +87,8 @@ export function useInvoiceImport(type: InvoiceType, onImported: () => void) {
     previewError,
     confirming,
     confirmError,
+    categories,
+    setCategory,
     selectFiles,
     removeFile,
     cancel,

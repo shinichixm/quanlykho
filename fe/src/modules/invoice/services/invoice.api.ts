@@ -2,6 +2,7 @@ import { API_BASE_URL } from "@/shared/config/api";
 import { fetcher } from "@/shared/lib/fetcher";
 import type {
   ConfirmInvoiceRow,
+  InvoiceCategory,
   InvoiceDetail,
   InvoiceListItem,
   InvoicePartnerOption,
@@ -31,10 +32,19 @@ export async function previewInvoicesApi(files: File[], type: InvoiceType) {
   return res.data;
 }
 
-export async function confirmInvoicesApi(files: File[], type: InvoiceType) {
+export async function confirmInvoicesApi(
+  files: File[],
+  type: InvoiceType,
+  categories?: Record<string, InvoiceCategory>
+) {
+  const formData = buildFilesFormData(files, type);
+  if (categories && Object.keys(categories).length > 0) {
+    formData.append("categories", JSON.stringify(categories));
+  }
+
   const res = await fetcher<ApiEnvelope<ConfirmInvoiceRow[]>>(
     `${API_BASE_URL}/api/invoices/confirm`,
-    { method: "POST", body: buildFilesFormData(files, type) }
+    { method: "POST", body: formData }
   );
 
   if (!res.ok || !res.data) {
@@ -51,13 +61,15 @@ export async function listInvoicesApi(
   dateFrom?: string,
   dateTo?: string,
   partnerId?: number,
-  productKeyword?: string
+  productKeyword?: string,
+  category?: InvoiceCategory
 ) {
   const params = new URLSearchParams({ type, page: String(page), pageSize: String(pageSize) });
   if (dateFrom) params.set("dateFrom", dateFrom);
   if (dateTo) params.set("dateTo", dateTo);
   if (partnerId) params.set("partnerId", String(partnerId));
   if (productKeyword) params.set("productKeyword", productKeyword);
+  if (category) params.set("category", category);
 
   const res = await fetcher<
     ApiEnvelope<{ rows: InvoiceListItem[]; total: number; totalAmountSum: string }>

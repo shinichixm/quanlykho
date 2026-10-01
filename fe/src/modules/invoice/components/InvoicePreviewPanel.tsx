@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Card } from "@/shared/ui/Card";
 import { Button } from "@/shared/ui/Button";
 import { BuildingIcon, ChevronRightIcon, TrashIcon } from "@/shared/ui/icons";
-import type { PreviewInvoiceRow } from "../types/invoice.types";
+import type { InvoiceCategory, PreviewInvoiceRow } from "../types/invoice.types";
 
 function formatCurrency(value: number | null) {
   if (value == null) return "-";
@@ -51,6 +51,8 @@ export function InvoicePreviewPanel({
   onCancel,
   onConfirm,
   onRemove,
+  categories,
+  onCategoryChange,
 }: {
   rows: PreviewInvoiceRow[];
   confirming: boolean;
@@ -58,6 +60,10 @@ export function InvoicePreviewPanel({
   onCancel: () => void;
   onConfirm: () => void;
   onRemove: (fileName: string) => void;
+  // Khi có 2 prop này, hiện nút phân loại Hàng hóa/Chi phí trên từng hóa đơn
+  // (chỉ dùng cho màn Hóa đơn đầu vào — Hóa đơn đầu ra không truyền vào).
+  categories?: Record<string, InvoiceCategory>;
+  onCategoryChange?: (fileName: string, category: InvoiceCategory) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { groups, invalid } = useMemo(() => groupByPartner(rows), [rows]);
@@ -168,6 +174,29 @@ export function InvoicePreviewPanel({
                           <span className="font-medium text-slate-800">
                             {formatCurrency(invoice.totalAmount)}
                           </span>
+                          {onCategoryChange && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onCategoryChange(
+                                  invoice.fileName,
+                                  (categories?.[invoice.fileName] ?? "goods") === "cost"
+                                    ? "goods"
+                                    : "cost"
+                                )
+                              }
+                              title="Bấm để chuyển giữa Hàng hóa / Chi phí"
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                (categories?.[invoice.fileName] ?? "goods") === "cost"
+                                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              }`}
+                            >
+                              {(categories?.[invoice.fileName] ?? "goods") === "cost"
+                                ? "Chi phí"
+                                : "Hàng hóa"}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onRemove(invoice.fileName)}

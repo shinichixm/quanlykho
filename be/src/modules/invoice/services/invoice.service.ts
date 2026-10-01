@@ -11,6 +11,7 @@ import { invoiceListQuerySchema } from "../schemas/invoice.schema";
 import { INVOICE_DEFAULT_PAGE_SIZE } from "../constants/invoice.constants";
 import type {
   ConfirmInvoiceRow,
+  InvoiceCategory,
   InvoiceDetail,
   InvoiceListItem,
   InvoiceType,
@@ -55,14 +56,16 @@ export async function previewInvoiceXmlBatchService(
 
 export async function confirmInvoiceXmlBatchService(
   files: UploadedFile[],
-  type: InvoiceType
+  type: InvoiceType,
+  categoriesByFileName: Record<string, InvoiceCategory> = {}
 ): Promise<ConfirmInvoiceRow[]> {
   const results: ConfirmInvoiceRow[] = [];
 
   for (const file of files) {
     try {
       const parsed = parseInvoiceXml(file.buffer.toString("utf-8"), type);
-      const imported = await importInvoiceTransaction(parsed, type);
+      const category = categoriesByFileName[file.fileName] ?? "goods";
+      const imported = await importInvoiceTransaction(parsed, type, category);
       results.push({
         fileName: file.fileName,
         success: true,
@@ -88,6 +91,7 @@ export async function confirmInvoiceXmlBatchService(
 
 export async function listInvoiceService(input: {
   type: InvoiceType;
+  category?: InvoiceCategory;
   page?: number;
   pageSize?: number;
   dateFrom?: string;
@@ -97,6 +101,7 @@ export async function listInvoiceService(input: {
 }): Promise<{ rows: InvoiceListItem[]; total: number; totalAmountSum: string }> {
   const parsed = invoiceListQuerySchema.parse({
     type: input.type,
+    category: input.category,
     page: input.page ?? 1,
     pageSize: input.pageSize ?? INVOICE_DEFAULT_PAGE_SIZE,
     dateFrom: input.dateFrom || undefined,
@@ -124,6 +129,7 @@ export async function listInvoiceService(input: {
 
   const { rows, total, totalAmountSum } = await findInvoiceList({
     type: parsed.type,
+    category: parsed.category,
     skip,
     take: parsed.pageSize,
     dateFrom: parsed.dateFrom,
@@ -136,6 +142,7 @@ export async function listInvoiceService(input: {
     rows: rows.map((row) => ({
       id: row.id,
       type: row.type as InvoiceType,
+      category: row.category as InvoiceCategory,
       invoiceNo: row.invoiceNo,
       invoiceSeries: row.invoiceSeries,
       issuedAt: row.issuedAt,
@@ -155,9 +162,32 @@ export async function getInvoiceDetailService(id: number): Promise<InvoiceDetail
     throw new Error("Không tìm thấy hóa đơn");
   }
 
+  // Hóa đơn "chi phí" không có Product -> dòng hàng nằm ở costItems thay vì items.
+  const items =
+    invoice.category === "cost"
+      ? invoice.costItems.map((item) => ({
+          id: item.id,
+          productName: item.name,
+          productCode: "",
+          unit: item.unit,
+          quantity: item.quantity.toString(),
+          unitPrice: item.unitPrice.toString(),
+          amount: item.amount.toString(),
+        }))
+      : invoice.items.map((item) => ({
+          id: item.id,
+          productName: item.product.name,
+          productCode: item.product.code,
+          unit: item.product.unit,
+          quantity: item.quantity.toString(),
+          unitPrice: item.unitPrice.toString(),
+          amount: item.amount.toString(),
+        }));
+
   return {
     id: invoice.id,
     type: invoice.type as InvoiceType,
+    category: invoice.category as InvoiceCategory,
     invoiceNo: invoice.invoiceNo,
     invoiceSeries: invoice.invoiceSeries,
     issuedAt: invoice.issuedAt,
@@ -170,15 +200,7 @@ export async function getInvoiceDetailService(id: number): Promise<InvoiceDetail
         : invoice.partner.taxCode,
       address: invoice.partner.address,
     },
-    items: invoice.items.map((item) => ({
-      id: item.id,
-      productName: item.product.name,
-      productCode: item.product.code,
-      unit: item.product.unit,
-      quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice.toString(),
-      amount: item.amount.toString(),
-    })),
+    items,
   };
 }
 

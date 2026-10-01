@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { listInvoicesApi } from "../services/invoice.api";
 import { INVOICE_PAGE_SIZE } from "../constants/invoice.constants";
-import type { InvoiceListItem, InvoiceType } from "../types/invoice.types";
+import type { InvoiceCategory, InvoiceListItem, InvoiceType } from "../types/invoice.types";
 
-export function useInvoiceList(type: InvoiceType) {
+export function useInvoiceList(type: InvoiceType, category?: InvoiceCategory) {
   const [rows, setRows] = useState<InvoiceListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [totalAmountSum, setTotalAmountSum] = useState("0");
@@ -29,7 +29,8 @@ export function useInvoiceList(type: InvoiceType) {
         dateFrom,
         dateTo,
         partnerId,
-        productKeyword
+        productKeyword,
+        category
       );
       setRows(result.rows);
       setTotal(result.total);
@@ -39,7 +40,7 @@ export function useInvoiceList(type: InvoiceType) {
     } finally {
       setLoading(false);
     }
-  }, [type, page, dateFrom, dateTo, partnerId, productKeyword]);
+  }, [type, category, page, dateFrom, dateTo, partnerId, productKeyword]);
 
   useEffect(() => {
     refetch();

@@ -10,7 +10,12 @@ import {
   listInvoiceService,
   previewInvoiceXmlBatchService,
 } from "../services/invoice.service";
-import { invoiceBulkDeleteBodySchema, invoiceTypeSchema } from "../schemas/invoice.schema";
+import {
+  invoiceBulkDeleteBodySchema,
+  invoiceCategorySchema,
+  invoiceTypeSchema,
+} from "../schemas/invoice.schema";
+import type { InvoiceCategory } from "../types/invoice.types";
 import { INVOICE_MAX_FILE_SIZE_BYTES } from "../constants/invoice.constants";
 
 export const invoiceRouter = Router();
@@ -25,6 +30,26 @@ function toUploadedFiles(files: Express.Multer.File[] | undefined) {
     fileName: file.originalname,
     buffer: file.buffer,
   }));
+}
+
+// FE gửi kèm field text "categories" (JSON: { "<fileName>": "goods" | "cost" }) trong
+// cùng multipart form với "files" — phân loại do người dùng chọn lúc xem trước.
+function parseCategoriesField(raw: unknown): Record<string, InvoiceCategory> {
+  if (typeof raw !== "string" || !raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+
+    const result: Record<string, InvoiceCategory> = {};
+    for (const [fileName, value] of Object.entries(parsed)) {
+      const check = invoiceCategorySchema.safeParse(value);
+      if (check.success) result[fileName] = check.data;
+    }
+    return result;
+  } catch {
+    return {};
+  }
 }
 
 invoiceRouter.post("/preview", upload.array("files"), async (req, res) => {
@@ -54,7 +79,9 @@ invoiceRouter.post("/confirm", upload.array("files"), async (req, res) => {
       return res.status(400).json(fail("Vui lòng chọn ít nhất 1 file XML"));
     }
 
-    const result = await confirmInvoiceXmlBatchService(files, type);
+    const categoriesByFileName = parseCategoriesField(req.body?.categories);
+
+    const result = await confirmInvoiceXmlBatchService(files, type, categoriesByFileName);
     return res.json(ok(result));
   } catch (error) {
     return res
@@ -66,6 +93,9 @@ invoiceRouter.post("/confirm", upload.array("files"), async (req, res) => {
 invoiceRouter.get("/", async (req, res) => {
   try {
     const type = invoiceTypeSchema.parse(req.query.type);
+    const category = req.query.category
+      ? invoiceCategorySchema.parse(req.query.category)
+      : undefined;
     const page = req.query.page ? Number(req.query.page) : undefined;
     const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
     const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
@@ -76,6 +106,7 @@ invoiceRouter.get("/", async (req, res) => {
 
     const result = await listInvoiceService({
       type,
+      category,
       page,
       pageSize,
       dateFrom,

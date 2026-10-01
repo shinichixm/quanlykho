@@ -58,6 +58,9 @@ model Partner {
 model Invoice {
   id            Int      @id @default(autoincrement())
   type          String   // "purchase" (mua vào -> nhập kho) | "sale" (bán ra -> xuất kho)
+  // "goods" (hàng hóa, mặc định — tạo Product/tồn kho) | "cost" (chi phí — chỉ áp dụng
+  // cho hóa đơn mua vào, dòng hàng lưu vào CostItem, KHÔNG đụng tới Product/tồn kho).
+  category      String   @default("goods")
   invoiceNo     String   // số hóa đơn
   invoiceSeries String?  // ký hiệu mẫu số
   issuedAt      DateTime // ngày hóa đơn
@@ -72,9 +75,26 @@ model Invoice {
 
   partner       Partner                      @relation(fields: [partnerId], references: [id])
   items         InvoiceItem[]
+  costItems     CostItem[]
   substitutions ReconciliationSubstitution[]
 
   @@unique([invoiceSeries, invoiceNo, partnerId])
+}
+
+// Dòng hàng của hóa đơn được phân loại "chi phí" khi import — tách khỏi InvoiceItem
+// để không bao giờ tạo Product/StockTransaction/Inventory (không phải hàng tồn kho).
+model CostItem {
+  id        Int     @id @default(autoincrement())
+  invoiceId Int
+  name      String  @db.VarChar(1000)
+  unit      String  @db.VarChar(255)
+  quantity  Decimal @db.Decimal(18, 3)
+  unitPrice Decimal @db.Decimal(18, 2)
+  amount    Decimal @db.Decimal(18, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
 }
 
 model InvoiceItem {

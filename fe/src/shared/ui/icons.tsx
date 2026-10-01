@@ -141,6 +141,15 @@ export function EditIcon(props: IconProps) {
   );
 }
 
+export function ReceiptIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+      <path d="M9 8h6M9 12h6" />
+    </svg>
+  );
+}
+
 export function BuildingIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

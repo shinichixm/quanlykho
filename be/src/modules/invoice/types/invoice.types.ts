@@ -1,4 +1,7 @@
 export type InvoiceType = "purchase" | "sale";
+// "goods" = hàng hóa (mặc định, tạo Product/tồn kho) | "cost" = chi phí (chỉ hóa đơn
+// mua vào, lưu riêng, không đụng Product/tồn kho).
+export type InvoiceCategory = "goods" | "cost";
 
 export type ParsedInvoiceItem = {
   name: string;
@@ -30,6 +33,7 @@ export type ImportInvoiceResult = {
 export type InvoiceListItem = {
   id: number;
   type: InvoiceType;
+  category: InvoiceCategory;
   invoiceNo: string;
   invoiceSeries: string | null;
   issuedAt: Date;
@@ -73,6 +77,7 @@ export type InvoiceDetailItem = {
 export type InvoiceDetail = {
   id: number;
   type: InvoiceType;
+  category: InvoiceCategory;
   invoiceNo: string;
   invoiceSeries: string | null;
   issuedAt: Date;

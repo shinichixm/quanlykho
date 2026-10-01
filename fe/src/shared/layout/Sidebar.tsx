@@ -13,6 +13,7 @@ import {
   DashboardIcon,
   InboxDownIcon,
   InboxUpIcon,
+  ReceiptIcon,
   ReportIcon,
   SearchCheckIcon,
 } from "../ui/icons";
@@ -21,6 +22,7 @@ const ICONS = {
   dashboard: DashboardIcon,
   "invoices-in": InboxDownIcon,
   "invoices-out": InboxUpIcon,
+  expenses: ReceiptIcon,
   inventory: BoxIcon,
   cart: CartIcon,
   customers: BuildingIcon,

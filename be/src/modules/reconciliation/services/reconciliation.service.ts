@@ -88,16 +88,18 @@ function buildReconciliationRow(invoice: {
 
 export async function listReconciliationInvoicesService(input: {
   status?: ReconciliationStatus;
+  partnerId?: number;
   page?: number;
   pageSize?: number;
 }): Promise<ReconciliationListResult> {
   const parsed = reconciliationListQuerySchema.parse({
     status: input.status,
+    partnerId: input.partnerId,
     page: input.page ?? 1,
     pageSize: input.pageSize ?? 20,
   });
 
-  const invoices = await findSaleInvoicesForReconciliation();
+  const invoices = await findSaleInvoicesForReconciliation(parsed.partnerId);
   const rows = invoices.map(buildReconciliationRow);
 
   const filteredRows = parsed.status ? rows.filter((row) => row.status === parsed.status) : rows;

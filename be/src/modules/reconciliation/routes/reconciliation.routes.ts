@@ -15,10 +15,11 @@ reconciliationRouter.get("/invoices", async (req, res) => {
     const status = req.query.status
       ? reconciliationStatusSchema.parse(req.query.status)
       : undefined;
+    const partnerId = req.query.partnerId ? Number(req.query.partnerId) : undefined;
     const page = req.query.page ? Number(req.query.page) : undefined;
     const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
 
-    const result = await listReconciliationInvoicesService({ status, page, pageSize });
+    const result = await listReconciliationInvoicesService({ status, partnerId, page, pageSize });
     return res.json(ok(result));
   } catch (error) {
     return res

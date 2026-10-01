@@ -4,9 +4,11 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { Card } from "@/shared/ui/Card";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Pagination } from "@/shared/ui/Pagination";
+import { SearchableSelect } from "@/shared/ui/SearchableSelect";
 import { SearchCheckIcon } from "@/shared/ui/icons";
 import { useReconciliationList } from "@/modules/reconciliation/hooks/useReconciliationList";
 import { ReconciliationTable } from "@/modules/reconciliation/components/ReconciliationTable";
+import { useInvoicePartners } from "@/modules/invoice/hooks/useInvoicePartners";
 import type { ReconciliationStatus } from "@/modules/reconciliation/types/reconciliation.types";
 
 const STATUS_TABS: { value: ReconciliationStatus | undefined; label: string }[] = [
@@ -16,8 +18,21 @@ const STATUS_TABS: { value: ReconciliationStatus | undefined; label: string }[] 
 ];
 
 export default function ReconciliationPage() {
-  const { rows, total, page, pageSize, setPage, status, setStatus, loading, error, refetch } =
-    useReconciliationList();
+  const {
+    rows,
+    total,
+    page,
+    pageSize,
+    setPage,
+    status,
+    setStatus,
+    partnerId,
+    setPartnerId,
+    loading,
+    error,
+    refetch,
+  } = useReconciliationList();
+  const partners = useInvoicePartners("sale");
 
   return (
     <div>
@@ -26,21 +41,33 @@ export default function ReconciliationPage() {
         description="Đối chiếu sản phẩm trong hóa đơn bán ra với tồn kho hiện tại để phát hiện hóa đơn xuất bán khi không còn hàng — mục này chỉ dùng để đối chiếu, không ảnh hưởng đến nghiệp vụ tồn kho"
       />
 
-      <div className="mb-4 flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 w-fit">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.label}
-            type="button"
-            onClick={() => setStatus(tab.value)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              status === tab.value
-                ? "bg-white text-blue-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 w-fit">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={() => setStatus(tab.value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                status === tab.value
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <SearchableSelect
+          options={partners}
+          value={partnerId}
+          onChange={setPartnerId}
+          getLabel={(partner) => partner.name}
+          getValue={(partner) => partner.id}
+          placeholder="Tất cả đối tác"
+          className="min-w-[260px]"
+        />
       </div>
 
       <Card>

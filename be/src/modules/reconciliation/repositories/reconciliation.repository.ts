@@ -1,9 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../shared/db/prisma";
 
-export function findSaleInvoicesForReconciliation() {
+export function findSaleInvoicesForReconciliation(partnerId?: number) {
   return prisma.invoice.findMany({
-    where: { type: "sale" },
+    where: { type: "sale", ...(partnerId ? { partnerId } : {}) },
     orderBy: { issuedAt: "desc" },
     include: {
       partner: true,

@@ -4,6 +4,7 @@ export const reconciliationStatusSchema = z.enum(["completed", "negative_stock"]
 
 export const reconciliationListQuerySchema = z.object({
   status: reconciliationStatusSchema.optional(),
+  partnerId: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(200).default(20),
 });

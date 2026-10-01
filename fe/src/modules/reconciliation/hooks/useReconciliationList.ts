@@ -11,6 +11,7 @@ export function useReconciliationList() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatusState] = useState<ReconciliationStatus | undefined>(undefined);
+  const [partnerId, setPartnerIdState] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -18,7 +19,7 @@ export function useReconciliationList() {
     setLoading(true);
     setError("");
     try {
-      const result = await listReconciliationInvoicesApi(status, page, PAGE_SIZE);
+      const result = await listReconciliationInvoicesApi(status, page, PAGE_SIZE, partnerId);
       setRows(result.rows);
       setTotal(result.total);
     } catch (err) {
@@ -26,7 +27,7 @@ export function useReconciliationList() {
     } finally {
       setLoading(false);
     }
-  }, [status, page]);
+  }, [status, page, partnerId]);
 
   useEffect(() => {
     refetch();
@@ -37,6 +38,11 @@ export function useReconciliationList() {
     setStatusState(nextStatus);
   }
 
+  function setPartnerId(nextPartnerId: number | undefined) {
+    setPage(1);
+    setPartnerIdState(nextPartnerId);
+  }
+
   return {
     rows,
     total,
@@ -45,6 +51,8 @@ export function useReconciliationList() {
     setPage,
     status,
     setStatus,
+    partnerId,
+    setPartnerId,
     loading,
     error,
     refetch,

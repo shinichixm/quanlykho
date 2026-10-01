@@ -18,10 +18,12 @@ export type SubstitutionInput = {
 export async function listReconciliationInvoicesApi(
   status: ReconciliationStatus | undefined,
   page = 1,
-  pageSize = 20
+  pageSize = 20,
+  partnerId?: number
 ) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (status) params.set("status", status);
+  if (partnerId) params.set("partnerId", String(partnerId));
 
   const res = await fetcher<ApiEnvelope<{ rows: ReconciliationInvoiceRow[]; total: number }>>(
     `${API_BASE_URL}/api/reconciliation/invoices?${params.toString()}`

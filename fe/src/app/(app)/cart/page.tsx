@@ -69,6 +69,7 @@ export default function CartPage() {
                   <th className="px-5 py-3">Tên hàng</th>
                   <th className="px-5 py-3">ĐVT</th>
                   <th className="px-5 py-3 text-right">Số lượng</th>
+                  <th className="px-5 py-3 text-right">Giá nhập</th>
                   <th className="px-5 py-3 text-right">Đơn giá</th>
                   <th className="px-5 py-3 text-right">Thành tiền</th>
                   <th className="px-5 py-3" />
@@ -91,6 +92,9 @@ export default function CartPage() {
                         }
                         className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
                       />
+                    </td>
+                    <td className="px-5 py-3 text-right text-slate-500">
+                      {item.avgCost !== undefined ? formatCurrency(item.avgCost) : "-"}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <input
@@ -122,7 +126,7 @@ export default function CartPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={5} className="px-5 py-3 text-right text-sm font-medium text-slate-500">
+                  <td colSpan={6} className="px-5 py-3 text-right text-sm font-medium text-slate-500">
                     Tổng cộng
                   </td>
                   <td className="px-5 py-3 text-right text-lg font-semibold text-blue-600">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { Card } from "@/shared/ui/Card";
 import { EmptyState } from "@/shared/ui/EmptyState";
@@ -8,6 +8,7 @@ import { Button } from "@/shared/ui/Button";
 import { CartIcon, TrashIcon, DownloadIcon } from "@/shared/ui/icons";
 import { useCart } from "@/modules/cart/hooks/useCart";
 import { ExportInvoiceModal } from "@/modules/cart/components/ExportInvoiceModal";
+import { getProductAvgCostsApi } from "@/modules/inventory/services/inventory.api";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("vi-VN");
@@ -17,8 +18,32 @@ export default function CartPage() {
   const { items, updateItem, removeItem, clear } = useCart();
   const [showExport, setShowExport] = useState(false);
   const [notice, setNotice] = useState("");
+  const [avgCosts, setAvgCosts] = useState<Record<number, string>>({});
 
   const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
+  // Lấy giá nhập bình quân hiện tại (không chụp nhanh) để luôn khớp với Tồn kho,
+  // kể cả khi sản phẩm được thêm vào giỏ từ trước và giá nhập đã thay đổi.
+  useEffect(() => {
+    const productIds = items.map((item) => item.productId);
+    if (productIds.length === 0) {
+      setAvgCosts({});
+      return;
+    }
+
+    let cancelled = false;
+    getProductAvgCostsApi(productIds)
+      .then((data) => {
+        if (!cancelled) setAvgCosts(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAvgCosts({});
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.map((item) => item.productId).join(",")]);
 
   function handleExported() {
     setShowExport(false);
@@ -94,7 +119,9 @@ export default function CartPage() {
                       />
                     </td>
                     <td className="px-5 py-3 text-right text-slate-500">
-                      {item.avgCost !== undefined ? formatCurrency(item.avgCost) : "-"}
+                      {item.productId in avgCosts
+                        ? formatCurrency(Number(avgCosts[item.productId]))
+                        : "..."}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <input

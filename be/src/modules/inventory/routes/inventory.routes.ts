@@ -4,6 +4,7 @@ import { inventoryStatusSchema } from "../schemas/inventory.schema";
 import {
   createInventoryAdjustmentService,
   exportInventoryReportExcelService,
+  getProductAvgCostsService,
   listInventoryService,
 } from "../services/inventory.service";
 
@@ -24,6 +25,23 @@ inventoryRouter.get("/", async (req, res) => {
     const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
 
     const result = await listInventoryService({ ...parseListQuery(req), page, pageSize });
+    return res.json(ok(result));
+  } catch (error) {
+    return res
+      .status(400)
+      .json(fail(error instanceof Error ? error.message : "Unknown error"));
+  }
+});
+
+inventoryRouter.get("/avg-costs", async (req, res) => {
+  try {
+    const raw = typeof req.query.productIds === "string" ? req.query.productIds : "";
+    const productIds = raw
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+
+    const result = await getProductAvgCostsService(productIds);
     return res.json(ok(result));
   } catch (error) {
     return res

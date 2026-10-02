@@ -30,7 +30,6 @@ export function AddToCartModal({ product, onClose }: Props) {
       unit: product.unit,
       quantity: qty,
       unitPrice: Number.isFinite(price) && price >= 0 ? price : 0,
-      avgCost: product.avgCost !== undefined ? Number(product.avgCost) : undefined,
     });
     onClose();
   }

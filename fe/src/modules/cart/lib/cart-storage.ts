@@ -30,7 +30,6 @@ export function addCartItem(item: CartItem) {
   if (existing) {
     existing.quantity += item.quantity;
     existing.unitPrice = item.unitPrice;
-    existing.avgCost = item.avgCost;
   } else {
     items.push(item);
   }

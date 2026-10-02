@@ -2,6 +2,7 @@ import { getCompanyInfoService } from "../../company/services/company.service";
 import { buildInventoryReportExcel } from "../lib/inventory-report-excel";
 import {
   createInventoryAdjustment,
+  findAvgCostInputsByProductIds,
   findInventoryReportData,
 } from "../repositories/inventory.repository";
 import { findProductById } from "../../product/repositories/product.repository";
@@ -152,6 +153,30 @@ export async function listInventoryService(
 export async function getInventoryTotalValueService(): Promise<number> {
   const { rows } = await computeInventoryRows({});
   return rows.reduce((sum, row) => sum + Number(row.closingValue), 0);
+}
+
+export async function getProductAvgCostsService(
+  productIds: number[]
+): Promise<Record<number, string>> {
+  const uniqueIds = [...new Set(productIds)];
+  const { purchaseItems, positiveAdjustments } = await findAvgCostInputsByProductIds(uniqueIds);
+
+  const result: Record<number, string> = {};
+  for (const id of uniqueIds) {
+    const items = purchaseItems.filter((item) => item.productId === id);
+    const adj = positiveAdjustments.filter((a) => a.productId === id);
+
+    const qty =
+      items.reduce((sum, item) => sum + Number(item.quantity), 0) +
+      adj.reduce((sum, a) => sum + Number(a.quantity), 0);
+    const amount =
+      items.reduce((sum, item) => sum + Number(item.amount), 0) +
+      adj.reduce((sum, a) => sum + Number(a.quantity) * Number(a.unitPrice), 0);
+
+    result[id] = (qty > 0 ? amount / qty : 0).toString();
+  }
+
+  return result;
 }
 
 export async function exportInventoryReportExcelService(input: PeriodInput): Promise<Buffer> {

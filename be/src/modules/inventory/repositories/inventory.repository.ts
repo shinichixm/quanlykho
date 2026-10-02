@@ -77,6 +77,27 @@ export async function findInventoryReportData(params: {
   return { products, purchaseItems, saleItems, adjustments, substitutionsUsed };
 }
 
+// Dữ liệu thô để tính giá vốn bình quân hiện tại cho 1 danh sách sản phẩm cụ thể
+// (dùng ở Giỏ hàng — không cần opening/in/out theo kỳ như báo cáo Tồn kho).
+export async function findAvgCostInputsByProductIds(productIds: number[]) {
+  if (productIds.length === 0) {
+    return { purchaseItems: [], positiveAdjustments: [] };
+  }
+
+  const [purchaseItems, positiveAdjustments] = await Promise.all([
+    prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { type: "purchase" } },
+      select: { productId: true, quantity: true, amount: true },
+    }),
+    prisma.inventoryAdjustment.findMany({
+      where: { productId: { in: productIds }, quantity: { gt: 0 } },
+      select: { productId: true, quantity: true, unitPrice: true },
+    }),
+  ]);
+
+  return { purchaseItems, positiveAdjustments };
+}
+
 export function createInventoryAdjustment(input: {
   productId: number;
   quantity: Prisma.Decimal | number;

@@ -35,6 +35,23 @@ export async function listInventoryApi(query: InventoryQuery, page = 1, pageSize
   return res.data;
 }
 
+export async function getProductAvgCostsApi(
+  productIds: number[]
+): Promise<Record<number, string>> {
+  if (productIds.length === 0) return {};
+
+  const params = new URLSearchParams({ productIds: productIds.join(",") });
+  const res = await fetcher<ApiEnvelope<Record<number, string>>>(
+    `${API_BASE_URL}/api/inventory/avg-costs?${params.toString()}`
+  );
+
+  if (!res.ok || !res.data) {
+    throw new Error(res.message || "Không tải được giá nhập");
+  }
+
+  return res.data;
+}
+
 export async function exportInventoryExcelApi(query: InventoryQuery) {
   const params = buildParams(query, {});
   await downloadAuthenticatedFile(

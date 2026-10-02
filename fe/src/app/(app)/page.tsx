@@ -17,7 +17,7 @@ function formatNumber(value: number) {
 }
 
 function formatCurrency(value: number) {
-  return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} đ`;
+  return `${Math.ceil(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 })} đ`;
 }
 
 function formatDate(value: string) {

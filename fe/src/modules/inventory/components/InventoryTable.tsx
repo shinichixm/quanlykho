@@ -13,7 +13,7 @@ function formatQty(value: string) {
 }
 
 function formatCurrency(value: string) {
-  return Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
+  return Math.ceil(Number(value)).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 const STATUS_LABEL: Record<InventoryRow["status"], string> = {

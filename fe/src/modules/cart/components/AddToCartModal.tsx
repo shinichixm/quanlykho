@@ -11,7 +11,7 @@ type Props = {
 };
 
 function formatCurrency(value: number) {
-  return value.toLocaleString("vi-VN", { maximumFractionDigits: 0 });
+  return Math.ceil(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 export function AddToCartModal({ product, onClose }: Props) {

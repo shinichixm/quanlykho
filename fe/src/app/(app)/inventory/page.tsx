@@ -19,7 +19,7 @@ import {
 import type { InventoryStatus } from "@/modules/inventory/types/inventory.types";
 
 function formatCurrency(value: string) {
-  return Number(value).toLocaleString("vi-VN") + " đ";
+  return Math.ceil(Number(value)).toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + " đ";
 }
 
 const STATUS_TABS: { value: InventoryStatus | undefined; label: string }[] = [

@@ -11,7 +11,7 @@ import { ExportInvoiceModal } from "@/modules/cart/components/ExportInvoiceModal
 import { getProductAvgCostsApi } from "@/modules/inventory/services/inventory.api";
 
 function formatCurrency(value: number) {
-  return value.toLocaleString("vi-VN");
+  return Math.ceil(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 export default function CartPage() {

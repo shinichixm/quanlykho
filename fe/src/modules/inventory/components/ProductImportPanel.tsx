@@ -5,7 +5,7 @@ import { Button } from "@/shared/ui/Button";
 import type { ProductImportPreviewRow, ProductImportResultRow } from "../services/inventory.api";
 
 function formatCurrency(value: number) {
-  return value.toLocaleString("vi-VN") + " đ";
+  return Math.ceil(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + " đ";
 }
 
 function formatQty(value: number) {

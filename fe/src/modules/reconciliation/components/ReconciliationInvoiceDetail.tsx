@@ -107,6 +107,12 @@ export function ReconciliationInvoiceDetail({
         <tbody>
           {row.items.map((item) => {
             const itemEntries = entries.filter((e) => e.invoiceItemId === item.invoiceItemId);
+            // Chỉ cần bổ sung đúng phần đang âm — phần đã có sẵn trong kho không cần bù.
+            const requiredQty = Math.min(
+              Number(item.quantitySold),
+              Math.max(0, -Number(item.currentStock))
+            );
+            const substitutedQty = itemEntries.reduce((sum, e) => sum + e.quantity, 0);
 
             return (
               <tr key={item.invoiceItemId} className="border-b border-slate-100 last:border-0 align-top">
@@ -139,6 +145,17 @@ export function ReconciliationInvoiceDetail({
                       </Button>
                     )}
                   </div>
+
+                  {!item.ok && requiredQty > 0 && (
+                    <div
+                      className={`mt-1 text-xs ${
+                        substitutedQty >= requiredQty ? "text-emerald-600" : "text-slate-500"
+                      }`}
+                    >
+                      Cần bổ sung: {formatQty(String(requiredQty))} {item.unit} (đã bổ sung{" "}
+                      {formatQty(String(substitutedQty))})
+                    </div>
+                  )}
 
                   {itemEntries.length > 0 && (
                     <div className="mt-2 flex flex-col gap-1">

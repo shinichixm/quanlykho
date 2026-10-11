@@ -156,13 +156,19 @@ export async function saveInvoiceSubstitutionsService(
     });
 
     for (const item of negativeItems) {
+      const inventory = item.product.inventory;
+      const currentStock = inventory ? Number(inventory.quantity) : 0;
+      // Chỉ cần bổ sung đúng PHẦN ĐANG ÂM (phần đã có sẵn trong kho không cần bù) —
+      // không bắt bổ sung toàn bộ số lượng đã bán trên hóa đơn.
+      const requiredQty = Math.min(Number(item.quantity), Math.max(0, -currentStock));
+
       const totalSubstituted = parsed.entries
         .filter((entry) => entry.invoiceItemId === item.id)
         .reduce((sum, entry) => sum + entry.quantity, 0);
 
-      if (totalSubstituted < Number(item.quantity)) {
+      if (totalSubstituted < requiredQty) {
         throw new Error(
-          `Sản phẩm "${item.product.name}" chưa được bổ sung đủ số lượng thay thế (cần ${item.quantity}, đã bổ sung ${totalSubstituted})`
+          `Sản phẩm "${item.product.name}" chưa được bổ sung đủ số lượng thay thế (cần ${requiredQty}, đã bổ sung ${totalSubstituted})`
         );
       }
     }

@@ -7,6 +7,15 @@ type CompanyInfo = {
   address: string | null;
 } | null;
 
+type InvoiceExportItem = {
+  productCode: string;
+  productName: string;
+  unit: string;
+  quantity: { toString(): string };
+  unitPrice: { toString(): string };
+  amount: { toString(): string };
+};
+
 type InvoiceExportRow = {
   invoiceNo: string;
   invoiceSeries: string | null;
@@ -14,9 +23,12 @@ type InvoiceExportRow = {
   totalAmount: { toString(): string };
   status: string;
   partner: { name: string; taxCode: string; address: string | null };
+  items: InvoiceExportItem[];
 };
 
-const LAST_COLUMN = "H";
+const LAST_COLUMN = "M";
+const QTY_FORMAT = "#,##0.###";
+const MONEY_FORMAT = "#,##0";
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -38,8 +50,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const TITLE_BY_TYPE: Record<InvoiceType, string> = {
-  purchase: "DANH SÁCH HÓA ĐƠN MUA VÀO",
-  sale: "DANH SÁCH HÓA ĐƠN BÁN RA",
+  purchase: "BẢNG KÊ CHI TIẾT HÓA ĐƠN MUA VÀO",
+  sale: "BẢNG KÊ CHI TIẾT HÓA ĐƠN BÁN RA",
 };
 
 function formatDate(date: Date): string {
@@ -61,17 +73,22 @@ export async function buildInvoiceListExcel(params: {
   dateTo?: Date;
 }): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Danh sách hóa đơn");
+  const sheet = workbook.addWorksheet("Chi tiết hóa đơn");
 
   sheet.columns = [
     { key: "stt", width: 6 },
-    { key: "invoiceNo", width: 14 },
-    { key: "invoiceSeries", width: 14 },
-    { key: "issuedAt", width: 14 },
-    { key: "taxCode", width: 16 },
-    { key: "partnerName", width: 45 },
-    { key: "totalAmount", width: 18 },
-    { key: "status", width: 14 },
+    { key: "invoiceNo", width: 12 },
+    { key: "invoiceSeries", width: 12 },
+    { key: "issuedAt", width: 12 },
+    { key: "taxCode", width: 15 },
+    { key: "partnerName", width: 35 },
+    { key: "productCode", width: 14 },
+    { key: "productName", width: 40 },
+    { key: "unit", width: 10 },
+    { key: "quantity", width: 11 },
+    { key: "unitPrice", width: 14 },
+    { key: "amount", width: 14 },
+    { key: "invoiceTotal", width: 16 },
   ];
 
   sheet.getCell("A1").value = `Tên đơn vị: ${params.company?.name || ""}`;
@@ -98,8 +115,13 @@ export async function buildInvoiceListExcel(params: {
     "Ngày lập",
     "Mã số thuế",
     "Đối tác",
-    "Tổng tiền",
-    "Trạng thái",
+    "Mã hàng",
+    "Tên hàng",
+    "ĐVT",
+    "Số lượng",
+    "Đơn giá",
+    "Thành tiền",
+    "Tổng tiền hóa đơn",
   ];
   headers.forEach((label, idx) => {
     headerRow.getCell(idx + 1).value = label;
@@ -112,51 +134,78 @@ export async function buildInvoiceListExcel(params: {
   });
 
   let rowIndex = 9;
-  let totalSum = 0;
+  let stt = 0;
+  let itemAmountSum = 0;
+  let invoiceTotalSum = 0;
 
-  for (const [idx, row] of params.rows.entries()) {
-    const excelRow = sheet.getRow(rowIndex);
-    const amount = Number(row.totalAmount);
-    totalSum += amount;
-
-    excelRow.getCell("A").value = idx + 1;
-    excelRow.getCell("B").value = row.invoiceNo;
-    excelRow.getCell("C").value = row.invoiceSeries || "-";
-    excelRow.getCell("D").value = formatDate(row.issuedAt);
-    excelRow.getCell("E").value = isPlaceholderTaxCode(row.partner.taxCode)
+  for (const invoice of params.rows) {
+    invoiceTotalSum += Number(invoice.totalAmount);
+    const taxCode = isPlaceholderTaxCode(invoice.partner.taxCode)
       ? "Không MST"
-      : row.partner.taxCode;
-    excelRow.getCell("F").value = row.partner.name;
-    excelRow.getCell("G").value = amount;
-    excelRow.getCell("G").numFmt = "#,##0";
-    excelRow.getCell("H").value = STATUS_LABEL[row.status] || row.status;
+      : invoice.partner.taxCode;
 
-    ["A", "D", "E", "H"].forEach((col) => {
-      excelRow.getCell(col).alignment = { horizontal: "center" };
-    });
+    const items = invoice.items.length > 0 ? invoice.items : [null];
 
-    excelRow.eachCell({ includeEmpty: true }, (cell) => {
-      cell.border = THIN_BORDER;
-    });
+    for (const item of items) {
+      stt += 1;
+      const excelRow = sheet.getRow(rowIndex);
 
-    rowIndex += 1;
+      excelRow.getCell("A").value = stt;
+      excelRow.getCell("B").value = invoice.invoiceNo;
+      excelRow.getCell("C").value = invoice.invoiceSeries || "-";
+      excelRow.getCell("D").value = formatDate(invoice.issuedAt);
+      excelRow.getCell("E").value = taxCode;
+      excelRow.getCell("F").value = invoice.partner.name;
+
+      if (item) {
+        const amount = Number(item.amount);
+        itemAmountSum += amount;
+
+        excelRow.getCell("G").value = item.productCode || "-";
+        excelRow.getCell("H").value = item.productName;
+        excelRow.getCell("I").value = item.unit;
+        excelRow.getCell("J").value = Number(item.quantity);
+        excelRow.getCell("K").value = Number(item.unitPrice);
+        excelRow.getCell("L").value = amount;
+        excelRow.getCell("J").numFmt = QTY_FORMAT;
+        excelRow.getCell("K").numFmt = MONEY_FORMAT;
+        excelRow.getCell("L").numFmt = MONEY_FORMAT;
+      } else {
+        excelRow.getCell("H").value = "(Hóa đơn không có dòng hàng)";
+      }
+
+      excelRow.getCell("M").value = Number(invoice.totalAmount);
+      excelRow.getCell("M").numFmt = MONEY_FORMAT;
+
+      ["A", "D", "E", "G", "I"].forEach((col) => {
+        excelRow.getCell(col).alignment = { horizontal: "center" };
+      });
+
+      excelRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = THIN_BORDER;
+      });
+
+      rowIndex += 1;
+    }
   }
 
-  if (params.rows.length === 0) {
+  if (stt === 0) {
     sheet.mergeCells(`A${rowIndex}:${LAST_COLUMN}${rowIndex}`);
     const emptyCell = sheet.getCell(`A${rowIndex}`);
     emptyCell.value = "Không có hóa đơn nào khớp bộ lọc";
     emptyCell.alignment = { horizontal: "center" };
-    rowIndex += 1;
   } else {
     const totalRow = sheet.getRow(rowIndex);
-    sheet.mergeCells(`A${rowIndex}:F${rowIndex}`);
+    sheet.mergeCells(`A${rowIndex}:K${rowIndex}`);
     totalRow.getCell("A").value = "Tổng cộng";
     totalRow.getCell("A").font = { bold: true };
     totalRow.getCell("A").alignment = { horizontal: "right" };
-    totalRow.getCell("G").value = totalSum;
-    totalRow.getCell("G").numFmt = "#,##0";
-    totalRow.getCell("G").font = { bold: true };
+    totalRow.getCell("L").value = itemAmountSum;
+    totalRow.getCell("L").numFmt = MONEY_FORMAT;
+    totalRow.getCell("L").font = { bold: true };
+    totalRow.getCell("M").value = invoiceTotalSum;
+    totalRow.getCell("M").numFmt = MONEY_FORMAT;
+    totalRow.getCell("M").font = { bold: true };
     totalRow.eachCell({ includeEmpty: true }, (cell) => {
       cell.border = THIN_BORDER;
     });

@@ -210,13 +210,18 @@ export async function findInvoiceList(
 }
 
 // Không phân trang — dùng cho xuất Excel toàn bộ danh sách khớp bộ lọc hiện tại.
+// Kèm cả dòng hàng (items/product) để xuất chi tiết sản phẩm trong từng hóa đơn.
 export function findInvoiceListForExport(params: InvoiceListFilters) {
   const where = buildInvoiceListWhere(params);
 
   return prisma.invoice.findMany({
     where,
     orderBy: { issuedAt: "desc" },
-    include: { partner: true },
+    include: {
+      partner: true,
+      items: { include: { product: true } },
+      costItems: true,
+    },
   });
 }
 

@@ -184,7 +184,27 @@ export async function exportInvoiceListExcelService(input: {
 
   return buildInvoiceListExcel({
     type: parsed.type,
-    rows,
+    rows: rows.map((row) => ({
+      ...row,
+      items:
+        row.category === "cost"
+          ? row.costItems.map((item) => ({
+              productCode: "",
+              productName: item.name,
+              unit: item.unit,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              amount: item.amount,
+            }))
+          : row.items.map((item) => ({
+              productCode: item.product.code,
+              productName: item.product.name,
+              unit: item.product.unit,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              amount: item.amount,
+            })),
+    })),
     company: company ? { name: company.name, address: company.address } : null,
     dateFrom: parsed.dateFrom,
     dateTo,

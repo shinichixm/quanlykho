@@ -5,6 +5,7 @@ import {
   confirmInvoiceXmlBatchService,
   deleteInvoiceService,
   deleteInvoicesBulkService,
+  exportInvoiceListExcelService,
   getInvoiceDetailService,
   listInvoicePartnersService,
   listInvoiceService,
@@ -115,6 +116,41 @@ invoiceRouter.get("/", async (req, res) => {
       productKeyword,
     });
     return res.json(ok(result));
+  } catch (error) {
+    return res
+      .status(400)
+      .json(fail(error instanceof Error ? error.message : "Unknown error"));
+  }
+});
+
+invoiceRouter.get("/export", async (req, res) => {
+  try {
+    const type = invoiceTypeSchema.parse(req.query.type);
+    const category = req.query.category
+      ? invoiceCategorySchema.parse(req.query.category)
+      : undefined;
+    const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
+    const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo : undefined;
+    const partnerId = req.query.partnerId ? Number(req.query.partnerId) : undefined;
+    const productKeyword =
+      typeof req.query.productKeyword === "string" ? req.query.productKeyword : undefined;
+
+    const buffer = await exportInvoiceListExcelService({
+      type,
+      category,
+      dateFrom,
+      dateTo,
+      partnerId,
+      productKeyword,
+    });
+
+    const filename = type === "purchase" ? "hoa-don-dau-vao.xlsx" : "hoa-don-dau-ra.xlsx";
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(buffer);
   } catch (error) {
     return res
       .status(400)

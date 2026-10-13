@@ -150,17 +150,17 @@ export async function importInvoiceTransaction(
   }
 }
 
-export async function findInvoiceList(params: {
+type InvoiceListFilters = {
   type: InvoiceType;
   category?: InvoiceCategory;
-  skip: number;
-  take: number;
   dateFrom?: Date;
   dateTo?: Date;
   partnerId?: number;
   productKeyword?: string;
-}) {
-  const where: Prisma.InvoiceWhereInput = {
+};
+
+function buildInvoiceListWhere(params: InvoiceListFilters): Prisma.InvoiceWhereInput {
+  return {
     type: params.type,
     ...(params.category ? { category: params.category } : {}),
     ...(params.partnerId ? { partnerId: params.partnerId } : {}),
@@ -187,6 +187,12 @@ export async function findInvoiceList(params: {
         }
       : {}),
   };
+}
+
+export async function findInvoiceList(
+  params: InvoiceListFilters & { skip: number; take: number }
+) {
+  const where = buildInvoiceListWhere(params);
 
   const [rows, total, aggregate] = await Promise.all([
     prisma.invoice.findMany({
@@ -201,6 +207,17 @@ export async function findInvoiceList(params: {
   ]);
 
   return { rows, total, totalAmountSum: aggregate._sum.totalAmount ?? new Prisma.Decimal(0) };
+}
+
+// Không phân trang — dùng cho xuất Excel toàn bộ danh sách khớp bộ lọc hiện tại.
+export function findInvoiceListForExport(params: InvoiceListFilters) {
+  const where = buildInvoiceListWhere(params);
+
+  return prisma.invoice.findMany({
+    where,
+    orderBy: { issuedAt: "desc" },
+    include: { partner: true },
+  });
 }
 
 export function findPartnersByInvoiceType(type: InvoiceType) {

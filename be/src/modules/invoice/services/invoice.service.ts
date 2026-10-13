@@ -1,12 +1,15 @@
 import { isPlaceholderTaxCode, parseInvoiceXml } from "../lib/xml-invoice-parser";
+import { buildInvoiceListExcel } from "../lib/invoice-list-excel";
 import {
   deleteInvoiceById,
   deleteInvoicesByIds,
   findInvoiceDetailById,
   findInvoiceList,
+  findInvoiceListForExport,
   findPartnersByInvoiceType,
   importInvoiceTransaction,
 } from "../repositories/invoice.repository";
+import { getCompanyInfoService } from "../../company/services/company.service";
 import { invoiceListQuerySchema } from "../schemas/invoice.schema";
 import { INVOICE_DEFAULT_PAGE_SIZE } from "../constants/invoice.constants";
 import type {
@@ -89,6 +92,13 @@ export async function confirmInvoiceXmlBatchService(
   return results;
 }
 
+// dateTo là ngày (không có giờ) nên đẩy tới cuối ngày để bao trọn cả ngày đó
+function toEndOfDayUtc(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
+  );
+}
+
 export async function listInvoiceService(input: {
   type: InvoiceType;
   category?: InvoiceCategory;
@@ -111,21 +121,7 @@ export async function listInvoiceService(input: {
   });
 
   const skip = (parsed.page - 1) * parsed.pageSize;
-
-  // dateTo là ngày (không có giờ) nên đẩy tới cuối ngày để bao trọn cả ngày đó
-  const dateTo = parsed.dateTo
-    ? new Date(
-        Date.UTC(
-          parsed.dateTo.getUTCFullYear(),
-          parsed.dateTo.getUTCMonth(),
-          parsed.dateTo.getUTCDate(),
-          23,
-          59,
-          59,
-          999
-        )
-      )
-    : undefined;
+  const dateTo = parsed.dateTo ? toEndOfDayUtc(parsed.dateTo) : undefined;
 
   const { rows, total, totalAmountSum } = await findInvoiceList({
     type: parsed.type,
@@ -154,6 +150,45 @@ export async function listInvoiceService(input: {
     total,
     totalAmountSum: totalAmountSum.toString(),
   };
+}
+
+export async function exportInvoiceListExcelService(input: {
+  type: InvoiceType;
+  category?: InvoiceCategory;
+  dateFrom?: string;
+  dateTo?: string;
+  partnerId?: number;
+  productKeyword?: string;
+}): Promise<Buffer> {
+  const parsed = invoiceListQuerySchema.parse({
+    type: input.type,
+    category: input.category,
+    dateFrom: input.dateFrom || undefined,
+    dateTo: input.dateTo || undefined,
+    partnerId: input.partnerId,
+    productKeyword: input.productKeyword || undefined,
+  });
+
+  const dateTo = parsed.dateTo ? toEndOfDayUtc(parsed.dateTo) : undefined;
+
+  const rows = await findInvoiceListForExport({
+    type: parsed.type,
+    category: parsed.category,
+    dateFrom: parsed.dateFrom,
+    dateTo,
+    partnerId: parsed.partnerId,
+    productKeyword: parsed.productKeyword,
+  });
+
+  const company = await getCompanyInfoService();
+
+  return buildInvoiceListExcel({
+    type: parsed.type,
+    rows,
+    company: company ? { name: company.name, address: company.address } : null,
+    dateFrom: parsed.dateFrom,
+    dateTo,
+  });
 }
 
 export async function getInvoiceDetailService(id: number): Promise<InvoiceDetail> {

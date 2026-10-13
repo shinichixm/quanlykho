@@ -6,7 +6,7 @@ import { Card } from "@/shared/ui/Card";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Pagination } from "@/shared/ui/Pagination";
 import { Button } from "@/shared/ui/Button";
-import { InboxUpIcon, TrashIcon } from "@/shared/ui/icons";
+import { DownloadIcon, InboxUpIcon, TrashIcon } from "@/shared/ui/icons";
 import { useInvoiceList } from "@/modules/invoice/hooks/useInvoiceList";
 import { useInvoicePartners } from "@/modules/invoice/hooks/useInvoicePartners";
 import { useInvoiceImport } from "@/modules/invoice/hooks/useInvoiceImport";
@@ -14,7 +14,11 @@ import { InvoiceFilePicker } from "@/modules/invoice/components/InvoiceFilePicke
 import { InvoicePreviewPanel } from "@/modules/invoice/components/InvoicePreviewPanel";
 import { InvoiceTable } from "@/modules/invoice/components/InvoiceTable";
 import { InvoiceDateFilter } from "@/modules/invoice/components/InvoiceDateFilter";
-import { deleteInvoiceApi, deleteInvoicesBulkApi } from "@/modules/invoice/services/invoice.api";
+import {
+  deleteInvoiceApi,
+  deleteInvoicesBulkApi,
+  exportInvoiceListExcelApi,
+} from "@/modules/invoice/services/invoice.api";
 import type { InvoiceListItem } from "@/modules/invoice/types/invoice.types";
 
 function formatCurrency(value: string) {
@@ -56,6 +60,27 @@ export default function InvoicesOutPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError("");
+    try {
+      await exportInvoiceListExcelApi(
+        "sale",
+        undefined,
+        dateFrom,
+        dateTo,
+        partnerId,
+        productKeyword
+      );
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Xuất Excel thất bại");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function toggleRow(id: number) {
     setSelectedIds((prev) =>
@@ -117,6 +142,10 @@ export default function InvoicesOutPage() {
                 Xóa đã chọn ({selectedIds.length})
               </Button>
             )}
+            <Button variant="secondary" onClick={handleExport} disabled={exporting || total === 0}>
+              <DownloadIcon width={14} height={14} />
+              {exporting ? "Đang xuất..." : "Xuất Excel"}
+            </Button>
             <InvoiceFilePicker onSelect={selectFiles} loading={loadingPreview} />
           </>
         }
@@ -131,6 +160,12 @@ export default function InvoicesOutPage() {
       {deleteError && (
         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
           {deleteError}
+        </div>
+      )}
+
+      {exportError && (
+        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+          {exportError}
         </div>
       )}
 

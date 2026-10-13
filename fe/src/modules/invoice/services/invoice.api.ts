@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/shared/config/api";
 import { fetcher } from "@/shared/lib/fetcher";
+import { downloadAuthenticatedFile } from "@/shared/lib/download-file";
 import type {
   ConfirmInvoiceRow,
   InvoiceCategory,
@@ -80,6 +81,28 @@ export async function listInvoicesApi(
   }
 
   return res.data;
+}
+
+export async function exportInvoiceListExcelApi(
+  type: InvoiceType,
+  category?: InvoiceCategory,
+  dateFrom?: string,
+  dateTo?: string,
+  partnerId?: number,
+  productKeyword?: string
+) {
+  const params = new URLSearchParams({ type });
+  if (category) params.set("category", category);
+  if (dateFrom) params.set("dateFrom", dateFrom);
+  if (dateTo) params.set("dateTo", dateTo);
+  if (partnerId) params.set("partnerId", String(partnerId));
+  if (productKeyword) params.set("productKeyword", productKeyword);
+
+  const filename = type === "purchase" ? "hoa-don-dau-vao.xlsx" : "hoa-don-dau-ra.xlsx";
+  await downloadAuthenticatedFile(
+    `${API_BASE_URL}/api/invoices/export?${params.toString()}`,
+    filename
+  );
 }
 
 export async function listInvoicePartnersApi(type: InvoiceType) {

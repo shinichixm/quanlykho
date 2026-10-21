@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/shared/ui/Button";
 import { useInStockProducts } from "../hooks/useInStockProducts";
-import { saveInvoiceSubstitutionsApi } from "../services/reconciliation.api";
+import { deleteSubstitutionApi, saveInvoiceSubstitutionsApi } from "../services/reconciliation.api";
 import { InStockProductPickerModal } from "./InStockProductPickerModal";
 import type { InStockProduct, ReconciliationInvoiceRow } from "../types/reconciliation.types";
 
@@ -13,6 +13,10 @@ function formatQty(value: string) {
 
 type LocalEntry = {
   key: string;
+  // Chỉ có khi phiếu đã được lưu trên server (khác với phiếu mới thêm tại chỗ,
+  // chưa bấm Lưu tạm/Hoàn thành) — dùng để biết phải gọi API xóa thật hay chỉ
+  // bỏ khỏi state cục bộ.
+  substitutionId?: number;
   invoiceItemId: number;
   substituteProductId: number;
   substituteProductCode: string;
@@ -24,6 +28,7 @@ function buildInitialEntries(row: ReconciliationInvoiceRow): LocalEntry[] {
   return row.items.flatMap((item) =>
     item.substitutions.map((sub) => ({
       key: `saved-${sub.id}`,
+      substitutionId: sub.id,
       invoiceItemId: item.invoiceItemId,
       substituteProductId: sub.substituteProductId,
       substituteProductCode: sub.substituteProductCode,
@@ -45,6 +50,8 @@ export function ReconciliationInvoiceDetail({
   const [pickerItemId, setPickerItemId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [deletingSubId, setDeletingSubId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const isResolved = row.status === "completed";
 
@@ -68,6 +75,31 @@ export function ReconciliationInvoiceDetail({
 
   function removeEntry(key: string) {
     setEntries((prev) => prev.filter((e) => e.key !== key));
+  }
+
+  async function handleDeleteSavedEntry(substitutionId: number) {
+    if (
+      !window.confirm(
+        "Xóa bổ sung này? Số lượng đã trừ ở sản phẩm thay thế sẽ được hoàn lại, hóa đơn có thể quay về trạng thái Âm kho."
+      )
+    ) {
+      return;
+    }
+
+    setDeletingSubId(substitutionId);
+    setDeleteError("");
+    try {
+      await deleteSubstitutionApi(row.id, substitutionId);
+      // row prop chỉ làm mới qua onSaved() (refetch ở component cha) — entries là
+      // state cục bộ, không tự đồng bộ theo prop mới, nên phải gỡ ngay tại đây để
+      // UI không còn hiện phiếu vừa xóa.
+      setEntries((prev) => prev.filter((e) => e.substitutionId !== substitutionId));
+      onSaved();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Xóa thất bại");
+    } finally {
+      setDeletingSubId(null);
+    }
   }
 
   async function handleSave(action: "draft" | "complete") {
@@ -159,25 +191,39 @@ export function ReconciliationInvoiceDetail({
 
                   {itemEntries.length > 0 && (
                     <div className="mt-2 flex flex-col gap-1">
-                      {itemEntries.map((entry) => (
-                        <div
-                          key={entry.key}
-                          className="flex items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600"
-                        >
-                          <span className="flex-1">
-                            {entry.substituteProductName} — SL {formatQty(String(entry.quantity))}
-                          </span>
-                          {!isResolved && (
-                            <button
-                              type="button"
-                              onClick={() => removeEntry(entry.key)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              Xóa
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      {itemEntries.map((entry) => {
+                        // Phiếu đã lưu trên server: luôn cho xóa (kể cả khi hóa đơn đã
+                        // "Hoàn thành") vì xóa sẽ gọi API hoàn trả tồn kho thật. Phiếu
+                        // mới thêm tại chỗ, chưa lưu: chỉ xóa khỏi state khi chưa hoàn thành.
+                        const isSaved = entry.substitutionId !== undefined;
+                        const canDelete = isSaved || !isResolved;
+                        const isDeleting = entry.substitutionId === deletingSubId;
+
+                        return (
+                          <div
+                            key={entry.key}
+                            className="flex items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                          >
+                            <span className="flex-1">
+                              {entry.substituteProductName} — SL {formatQty(String(entry.quantity))}
+                            </span>
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  isSaved
+                                    ? handleDeleteSavedEntry(entry.substitutionId!)
+                                    : removeEntry(entry.key)
+                                }
+                                disabled={isDeleting}
+                                className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                              >
+                                {isDeleting ? "Đang xóa..." : "Xóa"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -194,6 +240,10 @@ export function ReconciliationInvoiceDetail({
           onAdd={(product, qty) => addEntry(pickerItemId, product, qty)}
           onClose={() => setPickerItemId(null)}
         />
+      )}
+
+      {deleteError && (
+        <div className="mt-3 text-sm text-red-600">{deleteError}</div>
       )}
 
       {!isResolved && (

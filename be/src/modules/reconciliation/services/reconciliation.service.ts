@@ -2,6 +2,7 @@ import { getCompanyInfoService } from "../../company/services/company.service";
 import { buildReconciliationDetailExcel } from "../lib/reconciliation-detail-excel";
 import { computeHistoricalSaleBalances } from "../lib/historical-stock";
 import {
+  deleteSubstitutionEntry,
   findInStockProducts,
   findInvoiceWithItemsForReconciliation,
   findProductMovementsForReconciliation,
@@ -198,6 +199,24 @@ export async function saveInvoiceSubstitutionsService(
   if (!updated) {
     throw new Error("Không tìm thấy hóa đơn sau khi lưu");
   }
+
+  return buildReconciliationRow(updated, balances);
+}
+
+export async function deleteSubstitutionService(
+  invoiceId: number,
+  substitutionId: number
+): Promise<ReconciliationInvoiceRow> {
+  await deleteSubstitutionEntry({ invoiceId, substitutionId });
+
+  const updated = await findSaleInvoiceForReconciliationById(invoiceId);
+  if (!updated) {
+    throw new Error("Không tìm thấy hóa đơn sau khi xóa");
+  }
+
+  const productIds = [...new Set(updated.items.map((item) => item.productId))];
+  const movements = await findProductMovementsForReconciliation(productIds);
+  const balances = computeHistoricalSaleBalances(movements);
 
   return buildReconciliationRow(updated, balances);
 }

@@ -72,6 +72,19 @@ export async function saveInvoiceSubstitutionsApi(
   return res.data;
 }
 
+export async function deleteSubstitutionApi(invoiceId: number, substitutionId: number) {
+  const res = await fetcher<ApiEnvelope<ReconciliationInvoiceRow>>(
+    `${API_BASE_URL}/api/reconciliation/invoices/${invoiceId}/substitutions/${substitutionId}`,
+    { method: "DELETE" }
+  );
+
+  if (!res.ok || !res.data) {
+    throw new Error(res.message || "Xóa bổ sung thay thế thất bại");
+  }
+
+  return res.data;
+}
+
 export async function exportReconciliationInvoiceApi(invoiceId: number, invoiceNo: string) {
   await downloadAuthenticatedFile(
     `${API_BASE_URL}/api/reconciliation/invoices/${invoiceId}/export`,

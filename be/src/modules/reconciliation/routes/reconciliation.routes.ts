@@ -2,6 +2,7 @@ import { Router } from "express";
 import { fail, ok } from "../../../shared/lib/api-response";
 import { reconciliationStatusSchema } from "../schemas/reconciliation.schema";
 import {
+  deleteSubstitutionService,
   exportReconciliationInvoiceExcelService,
   listInStockProductsForReconciliationService,
   listReconciliationInvoicesService,
@@ -65,6 +66,19 @@ reconciliationRouter.put("/invoices/:id/substitutions", async (req, res) => {
   try {
     const invoiceId = Number(req.params.id);
     const result = await saveInvoiceSubstitutionsService(invoiceId, req.body || {});
+    return res.json(ok(result));
+  } catch (error) {
+    return res
+      .status(400)
+      .json(fail(error instanceof Error ? error.message : "Unknown error"));
+  }
+});
+
+reconciliationRouter.delete("/invoices/:id/substitutions/:substitutionId", async (req, res) => {
+  try {
+    const invoiceId = Number(req.params.id);
+    const substitutionId = Number(req.params.substitutionId);
+    const result = await deleteSubstitutionService(invoiceId, substitutionId);
     return res.json(ok(result));
   } catch (error) {
     return res

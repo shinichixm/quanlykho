@@ -188,3 +188,49 @@ export async function replaceInvoiceSubstitutions(params: {
     });
   });
 }
+
+// Xóa 1 phiếu bổ sung thay thế. Nếu phiếu đã "completed" (đã trừ kho sản phẩm
+// thay thế), hoàn lại đúng số lượng đó vào Inventory + ghi 1 StockTransaction
+// "in" để có vết — rồi mở lại hóa đơn (bỏ reconciliationResolvedAt) vì hóa đơn
+// không còn chắc đã được bổ sung đủ nữa.
+export async function deleteSubstitutionEntry(params: {
+  invoiceId: number;
+  substitutionId: number;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const substitution = await tx.reconciliationSubstitution.findUnique({
+      where: { id: params.substitutionId },
+    });
+
+    if (!substitution || substitution.invoiceId !== params.invoiceId) {
+      throw new Error("Không tìm thấy bổ sung thay thế cần xóa");
+    }
+
+    if (substitution.status === "completed") {
+      const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: params.invoiceId } });
+
+      await tx.inventory.upsert({
+        where: { productId: substitution.substituteProductId },
+        create: { productId: substitution.substituteProductId, quantity: substitution.quantity },
+        update: { quantity: { increment: substitution.quantity } },
+      });
+
+      await tx.stockTransaction.create({
+        data: {
+          productId: substitution.substituteProductId,
+          type: "in",
+          quantity: substitution.quantity,
+          invoiceId: params.invoiceId,
+          note: `Hoàn trả do xóa bổ sung thay thế cho hóa đơn ${invoice.invoiceNo}`,
+        },
+      });
+    }
+
+    await tx.reconciliationSubstitution.delete({ where: { id: params.substitutionId } });
+
+    await tx.invoice.update({
+      where: { id: params.invoiceId },
+      data: { reconciliationResolvedAt: null },
+    });
+  });
+}

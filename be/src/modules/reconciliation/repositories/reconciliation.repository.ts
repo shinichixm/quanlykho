@@ -9,9 +9,7 @@ export function findSaleInvoicesForReconciliation(partnerId?: number) {
       partner: true,
       items: {
         include: {
-          product: {
-            include: { inventory: true },
-          },
+          product: true,
           substitutions: {
             include: { substituteProduct: true },
           },
@@ -28,9 +26,7 @@ export function findSaleInvoiceForReconciliationById(invoiceId: number) {
       partner: true,
       items: {
         include: {
-          product: {
-            include: { inventory: true },
-          },
+          product: true,
           substitutions: {
             include: { substituteProduct: true },
           },
@@ -38,6 +34,63 @@ export function findSaleInvoiceForReconciliationById(invoiceId: number) {
       },
     },
   });
+}
+
+// Lấy toàn bộ lịch sử biến động tồn kho (nhập, điều chỉnh, dùng làm hàng thay thế,
+// bán ra) của 1 danh sách sản phẩm — dùng để mô phỏng tồn kho tại từng thời điểm
+// bán thay vì chỉ nhìn tồn kho hiện tại (xem lib/historical-stock.ts).
+export async function findProductMovementsForReconciliation(productIds: number[]) {
+  if (productIds.length === 0) {
+    return { purchaseItems: [], saleItems: [], adjustments: [], substitutionsUsed: [] };
+  }
+
+  const [purchaseItems, saleItems, adjustments, substitutionsUsed] = await Promise.all([
+    prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { type: "purchase" } },
+      select: {
+        productId: true,
+        quantity: true,
+        invoiceId: true,
+        invoice: { select: { issuedAt: true } },
+      },
+    }),
+    prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { type: "sale" } },
+      select: {
+        id: true,
+        productId: true,
+        quantity: true,
+        invoiceId: true,
+        invoice: { select: { issuedAt: true } },
+      },
+    }),
+    prisma.inventoryAdjustment.findMany({
+      where: { productId: { in: productIds } },
+      select: { id: true, productId: true, quantity: true, adjustedAt: true },
+    }),
+    prisma.reconciliationSubstitution.findMany({
+      where: { substituteProductId: { in: productIds }, status: "completed" },
+      select: { id: true, substituteProductId: true, quantity: true, createdAt: true },
+    }),
+  ]);
+
+  return {
+    purchaseItems: purchaseItems.map((p) => ({
+      productId: p.productId,
+      quantity: p.quantity,
+      invoiceId: p.invoiceId,
+      issuedAt: p.invoice.issuedAt,
+    })),
+    saleItems: saleItems.map((s) => ({
+      invoiceItemId: s.id,
+      productId: s.productId,
+      quantity: s.quantity,
+      invoiceId: s.invoiceId,
+      issuedAt: s.invoice.issuedAt,
+    })),
+    adjustments,
+    substitutionsUsed,
+  };
 }
 
 export function findInStockProducts(keyword?: string) {
@@ -65,7 +118,7 @@ export function findInvoiceWithItemsForReconciliation(invoiceId: number) {
   return prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
-      items: { include: { product: { include: { inventory: true } } } },
+      items: { include: { product: true } },
     },
   });
 }

@@ -1,8 +1,10 @@
 import { getCompanyInfoService } from "../../company/services/company.service";
 import { buildReconciliationDetailExcel } from "../lib/reconciliation-detail-excel";
+import { computeHistoricalSaleBalances } from "../lib/historical-stock";
 import {
   findInStockProducts,
   findInvoiceWithItemsForReconciliation,
+  findProductMovementsForReconciliation,
   findSaleInvoiceForReconciliationById,
   findSaleInvoicesForReconciliation,
   replaceInvoiceSubstitutions,
@@ -22,30 +24,35 @@ import type {
 
 type Decimalish = { toString(): string };
 
-function buildReconciliationRow(invoice: {
-  id: number;
-  invoiceNo: string;
-  invoiceSeries: string | null;
-  issuedAt: Date;
-  totalAmount: Decimalish;
-  reconciliationResolvedAt: Date | null;
-  partner: { name: string };
-  items: {
+function buildReconciliationRow(
+  invoice: {
     id: number;
-    quantity: Decimalish;
-    product: { code: string; name: string; unit: string; inventory: { quantity: Decimalish } | null };
-    substitutions: {
+    invoiceNo: string;
+    invoiceSeries: string | null;
+    issuedAt: Date;
+    totalAmount: Decimalish;
+    reconciliationResolvedAt: Date | null;
+    partner: { name: string };
+    items: {
       id: number;
       quantity: Decimalish;
-      status: string;
-      substituteProduct: { id: number; code: string; name: string };
+      product: { code: string; name: string; unit: string };
+      substitutions: {
+        id: number;
+        quantity: Decimalish;
+        status: string;
+        substituteProduct: { id: number; code: string; name: string };
+      }[];
     }[];
-  }[];
-}): ReconciliationInvoiceRow {
+  },
+  balances: Map<number, number>
+): ReconciliationInvoiceRow {
   const items: ReconciliationItem[] = invoice.items.map((item) => {
-    const inventory = item.product.inventory;
-    const currentStock = inventory ? Number(inventory.quantity) : 0;
-    const ok = Boolean(inventory) && currentStock >= 0;
+    // Tồn kho NGAY SAU hóa đơn bán này (theo dòng thời gian), không phải tồn kho
+    // hiện tại — tránh báo "âm kho" oan cho các hóa đơn bán trước khi hàng thật
+    // sự hết (xem lib/historical-stock.ts).
+    const currentStock = balances.get(item.id) ?? 0;
+    const ok = currentStock >= 0;
 
     const substitutions: SubstitutionEntry[] = item.substitutions.map((sub) => ({
       id: sub.id,
@@ -100,7 +107,14 @@ export async function listReconciliationInvoicesService(input: {
   });
 
   const invoices = await findSaleInvoicesForReconciliation(parsed.partnerId);
-  const rows = invoices.map(buildReconciliationRow);
+
+  const productIds = [
+    ...new Set(invoices.flatMap((invoice) => invoice.items.map((item) => item.productId))),
+  ];
+  const movements = await findProductMovementsForReconciliation(productIds);
+  const balances = computeHistoricalSaleBalances(movements);
+
+  const rows = invoices.map((invoice) => buildReconciliationRow(invoice, balances));
 
   const filteredRows = parsed.status ? rows.filter((row) => row.status === parsed.status) : rows;
 
@@ -148,18 +162,17 @@ export async function saveInvoiceSubstitutionsService(
     }
   }
 
+  const productIds = [...new Set(invoice.items.map((item) => item.productId))];
+  const movements = await findProductMovementsForReconciliation(productIds);
+  const balances = computeHistoricalSaleBalances(movements);
+
   if (parsed.action === "complete") {
-    const negativeItems = invoice.items.filter((item) => {
-      const inventory = item.product.inventory;
-      const currentStock = inventory ? Number(inventory.quantity) : 0;
-      return !inventory || currentStock < 0;
-    });
+    const negativeItems = invoice.items.filter((item) => (balances.get(item.id) ?? 0) < 0);
 
     for (const item of negativeItems) {
-      const inventory = item.product.inventory;
-      const currentStock = inventory ? Number(inventory.quantity) : 0;
-      // Chỉ cần bổ sung đúng PHẦN ĐANG ÂM (phần đã có sẵn trong kho không cần bù) —
-      // không bắt bổ sung toàn bộ số lượng đã bán trên hóa đơn.
+      const currentStock = balances.get(item.id) ?? 0;
+      // Chỉ cần bổ sung đúng PHẦN ĐANG ÂM tại thời điểm hóa đơn này (phần đã có
+      // sẵn trong kho không cần bù) — không bắt bổ sung toàn bộ số lượng đã bán.
       const requiredQty = Math.min(Number(item.quantity), Math.max(0, -currentStock));
 
       const totalSubstituted = parsed.entries
@@ -186,7 +199,7 @@ export async function saveInvoiceSubstitutionsService(
     throw new Error("Không tìm thấy hóa đơn sau khi lưu");
   }
 
-  return buildReconciliationRow(updated);
+  return buildReconciliationRow(updated, balances);
 }
 
 export async function exportReconciliationInvoiceExcelService(invoiceId: number): Promise<Buffer> {
@@ -195,7 +208,11 @@ export async function exportReconciliationInvoiceExcelService(invoiceId: number)
     throw new Error("Không tìm thấy hóa đơn bán ra");
   }
 
-  const row = buildReconciliationRow(invoice);
+  const productIds = [...new Set(invoice.items.map((item) => item.productId))];
+  const movements = await findProductMovementsForReconciliation(productIds);
+  const balances = computeHistoricalSaleBalances(movements);
+
+  const row = buildReconciliationRow(invoice, balances);
   const company = await getCompanyInfoService();
 
   return buildReconciliationDetailExcel({

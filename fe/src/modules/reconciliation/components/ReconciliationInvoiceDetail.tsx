@@ -100,7 +100,7 @@ export function ReconciliationInvoiceDetail({
             <th className="px-4 py-2">Tên hàng</th>
             <th className="px-4 py-2">ĐVT</th>
             <th className="px-4 py-2 text-right">SL bán</th>
-            <th className="px-4 py-2 text-right">Tồn hiện tại</th>
+            <th className="px-4 py-2 text-right">Tồn sau hóa đơn</th>
             <th className="px-4 py-2">Kết quả</th>
           </tr>
         </thead>
